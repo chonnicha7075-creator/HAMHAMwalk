@@ -1,4 +1,6 @@
-/* 🌸 HamHam Buddy styles */
+/* 🌸 HamHam Buddy v2 styles */
+
+@import url('https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&display=swap');
 
 #hh-pet {
     position: fixed;
@@ -14,6 +16,7 @@
     will-change: transform;
     pointer-events: auto;
     transform: translate(80px, 80px);
+    --flip: 1;
 }
 #hh-pet.hh-grabbing { cursor: grabbing; }
 
@@ -21,8 +24,8 @@
     width: 100%;
     height: 100%;
     position: relative;
+    transform: scaleX(var(--flip));
     transform-origin: center;
-    transition: transform .25s ease;
 }
 
 .hh-sprite {
@@ -36,31 +39,49 @@
     -webkit-user-drag: none;
     user-drag: none;
 }
-.hh-frame-a { animation: hh-blink-a 4.4s ease-in-out infinite, hh-bob 1.9s ease-in-out infinite; }
-.hh-frame-b { animation: hh-blink-b 4.4s ease-in-out infinite, hh-bob 1.9s ease-in-out infinite .9s; }
 
+/* IDLE: gentle bob + occasional blink (frame_b shows briefly) */
+.hh-frame-a { animation: hh-blink-a 5.5s ease-in-out infinite, hh-bob 2.4s ease-in-out infinite; }
+.hh-frame-b { animation: hh-blink-b 5.5s ease-in-out infinite, hh-bob 2.4s ease-in-out infinite; }
+
+/* Blink only ~5% of the cycle — natural blink, not flashing */
 @keyframes hh-blink-a {
-    0%, 42% { opacity: 1; }
-    50%, 92% { opacity: 0; }
+    0%, 92% { opacity: 1; }
+    94%, 97% { opacity: 0; }
     100% { opacity: 1; }
 }
 @keyframes hh-blink-b {
-    0%, 42% { opacity: 0; }
-    50%, 92% { opacity: 1; }
+    0%, 92% { opacity: 0; }
+    94%, 97% { opacity: 1; }
     100% { opacity: 0; }
 }
 @keyframes hh-bob {
     0%, 100% { translate: 0 0; }
-    50% { translate: 0 -5px; }
+    50% { translate: 0 -3px; }
 }
 
+/* WALKING: faster bouncy step + slight tilt */
+#hh-pet.hh-walking .hh-frame-a,
+#hh-pet.hh-walking .hh-frame-b {
+    animation: hh-walk-bounce .42s ease-in-out infinite, hh-walk-tilt .42s ease-in-out infinite;
+}
+@keyframes hh-walk-bounce {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -7px; }
+}
+@keyframes hh-walk-tilt {
+    0%, 100% { rotate: -3deg; }
+    50% { rotate: 3deg; }
+}
+
+/* CLICK BOUNCE */
 #hh-pet.hh-bounce .hh-inner { animation: hh-bounce .55s cubic-bezier(.36,.07,.19,.97); }
 @keyframes hh-bounce {
-    0%   { transform: scaleX(var(--flip,1)) translateY(0); }
-    25%  { transform: scaleX(var(--flip,1)) translateY(-14px) rotate(-6deg); }
-    50%  { transform: scaleX(var(--flip,1)) translateY(0) scale(1.15, .85); }
-    75%  { transform: scaleX(var(--flip,1)) translateY(-6px) rotate(4deg); }
-    100% { transform: scaleX(var(--flip,1)) translateY(0); }
+    0%   { transform: scaleX(var(--flip)) translateY(0); }
+    25%  { transform: scaleX(var(--flip)) translateY(-14px) rotate(-6deg); }
+    50%  { transform: scaleX(var(--flip)) translateY(0) scale(1.15, .85); }
+    75%  { transform: scaleX(var(--flip)) translateY(-6px) rotate(4deg); }
+    100% { transform: scaleX(var(--flip)) translateY(0); }
 }
 
 /* ─────────────── Speech bubble ─────────────── */
@@ -70,23 +91,24 @@
     --hh-bg: #fff5f9;
     background: var(--hh-bg);
     color: #5a2240;
-    border: 2px solid var(--hh-border);
-    border-radius: 16px;
-    padding: 8px 14px;
-    font-family: 'Quicksand', 'Sarabun', system-ui, sans-serif;
-    font-size: 13px;
+    border: 2.5px solid var(--hh-border);
+    border-radius: 20px;
+    padding: 9px 16px 10px;
+    font-family: 'Mali', 'Sarabun', system-ui, sans-serif;
+    font-size: 14px;
     font-weight: 600;
-    line-height: 1.5;
-    max-width: 220px;
+    line-height: 1.55;
+    max-width: 240px;
     z-index: 9999;
     opacity: 0;
-    transform: translate(-50%, -100%) scale(.7);
+    transform: translate(-50%, -100%) scale(.6);
     transform-origin: bottom center;
-    transition: opacity .25s ease, transform .35s cubic-bezier(.34,1.56,.64,1);
+    transition: opacity .25s ease, transform .4s cubic-bezier(.34,1.56,.64,1);
     pointer-events: none;
-    box-shadow: 0 6px 18px rgba(215, 120, 155, .25), 0 1px 0 rgba(255, 255, 255, .9) inset;
+    box-shadow: 0 8px 22px rgba(215, 120, 155, .28), 0 1px 0 rgba(255, 255, 255, .9) inset;
     white-space: pre-wrap;
     word-break: break-word;
+    letter-spacing: .01em;
 }
 #hh-bubble.hh-visible {
     opacity: 1;
@@ -95,10 +117,10 @@
 #hh-bubble::before, #hh-bubble::after {
     content: '';
     position: absolute;
-    bottom: -10px;
+    bottom: -11px;
     left: 50%;
     transform: translateX(-50%);
-    border: 9px solid transparent;
+    border: 10px solid transparent;
     border-top-color: var(--hh-border);
     border-bottom: 0;
 }
@@ -108,7 +130,7 @@
     border-width: 8px;
 }
 #hh-bubble.hh-bubble-below {
-    transform: translate(-50%, 0) scale(.7);
+    transform: translate(-50%, 0) scale(.6);
 }
 #hh-bubble.hh-bubble-below.hh-visible {
     transform: translate(-50%, 0) scale(1);
@@ -116,9 +138,9 @@
 #hh-bubble.hh-bubble-below::before,
 #hh-bubble.hh-bubble-below::after {
     bottom: auto;
-    top: -10px;
+    top: -11px;
     border-top: 0;
-    border-bottom: 9px solid transparent;
+    border-bottom: 10px solid transparent;
     border-bottom-color: var(--hh-border);
 }
 #hh-bubble.hh-bubble-below::after {
@@ -130,25 +152,26 @@
 /* ─────────────── Settings panel ─────────────── */
 #hh-panel {
     position: fixed;
-    width: 260px;
-    background: linear-gradient(160deg, #fff5f9 0%, #ffe5ef 100%);
-    border: 2px solid #d7789b;
-    border-radius: 18px;
-    padding: 14px 14px 12px;
+    width: 270px;
+    background: linear-gradient(160deg, #fff5f9 0%, #ffe0ec 100%);
+    border: 2.5px solid #d7789b;
+    border-radius: 22px;
+    padding: 16px 16px 14px;
     z-index: 10000;
-    font-family: 'Quicksand', 'Sarabun', system-ui, sans-serif;
-    font-size: 12px;
+    font-family: 'Mali', 'Sarabun', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
     color: #5a2240;
-    box-shadow: 0 12px 36px rgba(215, 120, 155, .35), 0 2px 0 rgba(255, 255, 255, .8) inset;
-    max-height: 85vh;
+    box-shadow: 0 14px 38px rgba(215, 120, 155, .38), 0 2px 0 rgba(255, 255, 255, .85) inset;
+    max-height: 88vh;
     overflow-y: auto;
 }
 .hh-panel-title {
-    font-size: 14px;
-    font-weight: 800;
+    font-size: 16px;
+    font-weight: 700;
     margin-bottom: 10px;
     text-align: center;
-    letter-spacing: .03em;
+    letter-spacing: .02em;
     color: #a83d62;
 }
 .hh-row {
@@ -156,15 +179,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 5px 2px;
-    border-bottom: 1px dashed rgba(215, 120, 155, .25);
-    font-weight: 600;
+    padding: 6px 2px;
+    border-bottom: 1px dashed rgba(215, 120, 155, .3);
 }
 .hh-row:last-child { border-bottom: none; }
+.hh-row.hh-col { flex-direction: column; align-items: stretch; gap: 4px; }
+.hh-row .hh-val { font-weight: 700; color: #a83d62; }
 .hh-row input[type="checkbox"] {
     accent-color: #d7789b;
-    width: 16px;
-    height: 16px;
+    width: 17px;
+    height: 17px;
     cursor: pointer;
 }
 .hh-row input[type="range"] {
@@ -172,25 +196,33 @@
     width: 110px;
     cursor: pointer;
 }
-.hh-mood-row {
-    flex-direction: column;
-    align-items: stretch;
+.hh-row select {
+    background: white;
+    border: 1.5px solid #d7789b;
+    border-radius: 10px;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #5a2240;
+    cursor: pointer;
+    width: 100%;
 }
+.hh-mood-row { flex-direction: column; align-items: stretch; }
 .hh-moods {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
+    gap: 5px;
     margin-top: 6px;
 }
 .hh-moods button {
     background: white;
-    border: 1px solid #d7789b;
-    border-radius: 8px;
-    padding: 4px 2px;
-    font-size: 10px;
+    border: 1.5px solid #d7789b;
+    border-radius: 10px;
+    padding: 5px 2px;
+    font-size: 11px;
     color: #a83d62;
     cursor: pointer;
-    font-weight: 700;
+    font-weight: 600;
     font-family: inherit;
     transition: all .15s ease;
 }
@@ -201,12 +233,13 @@
 }
 #hh-panel .hh-close {
     width: 100%;
-    padding: 6px;
+    padding: 8px;
     background: #d7789b;
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     font-weight: 700;
+    font-size: 13px;
     cursor: pointer;
     font-family: inherit;
     margin-top: 4px;
