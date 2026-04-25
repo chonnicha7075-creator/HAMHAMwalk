@@ -1,12 +1,14 @@
-// 🌸 HamHam Buddy v2 — desktop pet for SillyTavern
-// - Cute hamster chitter (Web Audio) instead of robotic TTS
-// - Step-by-step walking animation (not floating)
-// - Mali font, calmer blink, way more lines
+// 🌸 HamHam Buddy v3
+// - Default voice = best-tuned TTS (cute pitch + mood-based rate)
+// - Voice picker so user can find their favorite voice on their device
+// - 5-second long-press to open settings (with visual progress ring)
+// - Right-click on PC still opens settings instantly
 
 import { eventSource, event_types, saveSettingsDebounced } from "../../../../script.js";
 import { extension_settings, getContext } from "../../../extensions.js";
 
 const MODULE = "HamHamBuddy";
+const LONG_PRESS_MS = 5000;
 
 // ───────────────────────────── Sprite map ─────────────────────────────
 const SPRITES = {
@@ -33,13 +35,26 @@ const MOOD_COLORS = {
     nsfw:     { border: "#d7789b", bg: "#fff0f5" },
 };
 
-// chitter pitch by mood (multiplier on base 700-1100 Hz)
+// pitch + rate per mood (TTS)
+const MOOD_TTS = {
+    happy:    { pitch: 2.0, rate: 1.05 },
+    wave:     { pitch: 1.95, rate: 1.0 },
+    curious:  { pitch: 1.85, rate: 1.0 },
+    normal:   { pitch: 1.75, rate: 0.97 },
+    nsfw:     { pitch: 1.7,  rate: 0.93 },
+    scheming: { pitch: 1.6,  rate: 0.95 },
+    tense:    { pitch: 1.7,  rate: 1.05 },
+    angry:    { pitch: 1.55, rate: 1.15 },
+    sad:      { pitch: 1.35, rate: 0.85 },
+};
+
+// chitter pitch by mood
 const MOOD_PITCH = {
     happy: 1.45, wave: 1.35, curious: 1.20, normal: 1.00,
     nsfw: 1.05, scheming: 0.95, tense: 0.90, angry: 0.80, sad: 0.70,
 };
 
-// ───────────────────────────── Reaction lines (เยอะขึ้นเยอะ) ─────────────────────────────
+// ───────────────────────────── Lines ─────────────────────────────
 const LINES = {
     click: [
         "โอ้ย ทำหนูทำไมเนี่ย!",
@@ -51,27 +66,26 @@ const LINES = {
         "นิ้วใหญ่จัง น่ากลัวอ่ะ",
         "อย่าน้าาา หนูตัวบาง!",
         "หนูบอกแล้วไงว่าอย่าจิ้ม",
-        "จุ่บปากแบบเปาเปา 🤨",
         "เธอนี่นะ ขี้แกล้งง",
         "ก๊าก! ตกใจหมดเลย",
         "พี่นี่นะ ใจร้ายจังเลย ฮึ่ง",
         "เอ๊ะ ทำไมต้องจิ้มหนูด้วย!",
     ],
     clickAngry: [
-        "พอได้แล้ว! 😡",
+        "พอได้แล้ว!",
         "หนูจะกัดจริงๆ แล้วน้า!",
         "ไม่เล่นด้วยแล้ว! ฮึ่ง!",
         "แกล้งหนูพอแล้วน้า โกรธจริงน่ะ!",
         "พี่!! หนูจะร้องบอกแม่มุนะ!",
-        "ใจร้ายมากเลยรู้มั้ย!! 😤",
+        "ใจร้ายมากเลยรู้มั้ย!",
         "ไม่ปั่นด้วยแล้ว ไปแล้ว ฮึ่ง!",
         "บอกแล้วไงว่าหยุด! ไม่ฟังเลย!",
     ],
     clickSad: [
-        "หนูร้องไห้แล้วน้า... 🥺",
+        "หนูร้องไห้แล้วน้า...",
         "ทำไมแกล้งหนูตลอดเลยอ่ะ...",
         "หนูไปอยู่คนเดียวดีกว่า ฮึ่ก",
-        "พี่ไม่รักหนูแล้วเหรอ... 😢",
+        "พี่ไม่รักหนูแล้วเหรอ...",
         "หนูเจ็บจริงๆ น้า ฮือออ",
         "ไม่อยากเล่นกับพี่อีกแล้ว...",
         "หนูทำอะไรผิดเหรอ ทำไมแกล้งกัน...",
@@ -85,24 +99,24 @@ const LINES = {
         "บินได้เหรอเนี่ย น่ากลัวจังง",
         "ปล่อยหนูสิ! ปล่อยน้า!",
         "พี่หิ้วหนูแบบไม่บอกก่อน รุนแรง!",
-        "หมุนๆ เวียนหัวแล้ววว 😵",
-        "พี่จะพาหนูไปไหนเหรอ บ๊วยมั้ย? 🥺",
+        "หมุนๆ เวียนหัวแล้วววว",
+        "พี่จะพาหนูไปไหนเหรอ บ๊วยมั้ย",
         "ระวังด้วยนะ หนูเปราะบาง!",
         "หนูร้องน้อยา ใครก็ได้ช่วยที!",
         "อ๊ายย ทำไมต้องลากด้วยอ่ะ",
     ],
     blocking: [
-        "บังข้อความดีกว่าอิอิ ไม่เห็นแล้วว 🙈",
+        "บังข้อความดีกว่าอิอิ ไม่เห็นแล้วว",
         "เห็นมั้ยคะ ไม่เห็นใช่ปะ ฮิๆ",
         "เธอไม่ต้องอ่าน หนูบังให้",
         "ตรงนี้ของหนูแล้วน้า",
-        "อยากอ่านเหรอ ไล่หนูสิ ม่ายไป๊ 🤭",
+        "อยากอ่านเหรอ ไล่หนูสิ ม่ายไป๊",
         "นั่งทับดีก่า ฮิๆ",
-        "ความลับของพี่ หนูเก็บให้ 🤫",
+        "ความลับของพี่ หนูเก็บให้",
         "อย่าอ่านน้า อยู่กับหนูดีกว่า",
         "ทำตัวเป็นป้าย censor ฮิๆ",
-        "หนูเป็น sticker บังข้อความน้า~",
-        "ตรงนี้ของหนูจองแล้ว!",
+        "หนูเป็น sticker บังข้อความน้า",
+        "ตรงนี้ของหนูจองแล้ว",
     ],
     idle: [
         "หิวจัง...",
@@ -113,22 +127,22 @@ const LINES = {
         "เด๋วต้องไปกินขนม",
         "แม่มุๆ คิดถึงงง",
         "เบื่อจัง ทำไรดีน้า",
-        "อยากกินเมล็ดทานตะวัน 🌻",
+        "อยากกินเมล็ดทานตะวัน",
         "ขนหนูฟูๆ น่ารักมั้ยคะ",
         "หาวๆ ง่วงๆ",
-        "ฮัมเพลงนิดนึงน้า ลา ลา ลา~",
+        "ฮัมเพลงนิดนึงน้า ลา ลา ลา",
         "ใครเรียกหนูเหรอ?",
         "วันนี้พี่ดูเท่ดีน้า ฮิๆ",
-        "หนูแก้มยุ้ย เพราะเก็บอาหารไว้ 🐹",
+        "หนูแก้มยุ้ย เพราะเก็บอาหารไว้",
     ],
     greeting: [
-        "ฮัลโหลล! แฮมๆ มาแล้วว 🌸",
+        "ฮัลโหลล! แฮมๆ มาแล้วว",
         "พี่กลับมาแล้วเหรอ คิดถึงงง",
         "ว่าไง ว่าไง วันนี้เล่นอะไรกันดี",
-        "เย้! ได้เจอพี่แล้ว 💕",
-        "ตื่นแล้วน้าาา~",
+        "เย้! ได้เจอพี่แล้ว",
+        "ตื่นแล้วน้าาา",
         "วันนี้พร้อมแล้วค่า!",
-        "ฮายยย พี่~ คิดถึงสุดๆ เลย",
+        "ฮายยย พี่ คิดถึงสุดๆ เลย",
     ],
 };
 
@@ -143,7 +157,11 @@ const DEFAULTS = {
     idleChatter: true,
     posX: 80,
     posY: 80,
-    voiceMode: "chitter",  // "chitter" | "tts" | "off"
+    voiceMode: "tts",       // tts | chitter | off
+    ttsVoice: "",            // empty = auto
+    ttsPitchBoost: 0,        // -0.5 ... +0.25 user adjustment on top of mood pitch
+    ttsRate: 1.0,            // user multiplier
+    ttsVolume: 0.85,
     chitterVolume: 0.18,
 };
 
@@ -161,11 +179,14 @@ const state = {
     walkAnim: null,
     queue: [],
     queueRunning: false,
-    drag: { active: false, moved: false, ox: 0, oy: 0, downAt: 0, sx: 0, sy: 0 },
+    drag: { active: false, moved: false, longPressed: false, ox: 0, oy: 0, downAt: 0, sx: 0, sy: 0 },
     clickStreak: 0,
     clickResetTimer: null,
     audioCtx: null,
     audioUnlocked: false,
+    ring: null,
+    ringStart: null,
+    ringRAF: null,
 };
 
 // ───────────────────────────── Utils ─────────────────────────────
@@ -181,7 +202,7 @@ function settings() {
 }
 function save() { saveSettingsDebounced(); }
 
-// ───────────────────────────── Audio: cute hamster chitter ─────────────────────────────
+// ───────────────────────────── Audio ─────────────────────────────
 function getAudio() {
     if (!state.audioCtx) {
         const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -190,85 +211,110 @@ function getAudio() {
     }
     return state.audioCtx;
 }
-// iOS/Chrome require user-gesture to start AudioContext
 function unlockAudio() {
     if (state.audioUnlocked) return;
     const ctx = getAudio();
-    if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx?.state === "suspended") ctx.resume();
+    if (window.speechSynthesis) {
+        try {
+            const u = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(u);
+        } catch (_) {}
+    }
     state.audioUnlocked = true;
 }
 
 function chitter(text, mood = "normal") {
-    const s = settings();
-    if (s.voiceMode !== "chitter") return;
     const ctx = getAudio();
     if (!ctx) return;
     if (ctx.state === "suspended") {
-        // try to resume; if not unlocked yet, just bail
         ctx.resume();
         if (ctx.state === "suspended") return;
     }
-
-    // syllable count from text length (Thai chars ~ 1 syllable per 2 chars on average)
+    const s = settings();
     const syllables = clamp(Math.floor((text || "").length / 2.2), 2, 14);
     const moodPitch = MOOD_PITCH[mood] || 1.0;
     const vol = s.chitterVolume;
-
     const now = ctx.currentTime;
-    const interval = 0.11; // sec between blips
+    const interval = 0.11;
 
     for (let i = 0; i < syllables; i++) {
         const t = now + i * interval;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         const filter = ctx.createBiquadFilter();
-
-        // triangle = soft, squeaky
         osc.type = "triangle";
-
-        // Each syllable: pitch wobble so it sounds organic, not mechanical
         const basePitch = (700 + Math.random() * 400) * moodPitch;
-        // tone shape: rises slightly then falls, like a real squeak
         osc.frequency.setValueAtTime(basePitch * 0.85, t);
         osc.frequency.linearRampToValueAtTime(basePitch * 1.08, t + 0.025);
         osc.frequency.exponentialRampToValueAtTime(basePitch * 0.7, t + 0.09);
-
-        // mild lowpass for warmth
         filter.type = "lowpass";
         filter.frequency.value = 3200;
-        filter.Q.value = 1.0;
-
-        // ADSR — fast attack, fast decay
         gain.gain.setValueAtTime(0, t);
         gain.gain.linearRampToValueAtTime(vol, t + 0.012);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
-
         osc.connect(filter).connect(gain).connect(ctx.destination);
         osc.start(t);
         osc.stop(t + 0.12);
     }
 }
 
-// fallback: TTS (only if user chose it)
-function speakTTS(text) {
+let voicesCache = [];
+function loadVoices() {
+    if (!window.speechSynthesis) return [];
+    const v = window.speechSynthesis.getVoices() || [];
+    if (v.length) voicesCache = v;
+    return voicesCache;
+}
+if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    setTimeout(loadVoices, 100);
+    setTimeout(loadVoices, 800);
+}
+
+function pickBestVoice() {
+    const voices = loadVoices();
+    if (!voices.length) return null;
+    const s = settings();
+    if (s.ttsVoice) {
+        const found = voices.find(v => v.name === s.ttsVoice);
+        if (found) return found;
+    }
+    const score = (v) => {
+        const n = (v.name || "").toLowerCase();
+        const lang = (v.lang || "").toLowerCase();
+        let pts = 0;
+        if (lang.startsWith("th")) pts += 100;
+        if (/(kanya|narisa|premwadee|orachat)/i.test(n)) pts += 50;
+        if (/google/i.test(n) && lang.startsWith("th")) pts += 30;
+        if (/female|woman|girl/i.test(n)) pts += 10;
+        return pts;
+    };
+    const sorted = [...voices].sort((a, b) => score(b) - score(a));
+    return sorted[0] || null;
+}
+
+function speakTTS(text, mood = "normal") {
     if (!window.speechSynthesis) return;
     try {
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        const voices = window.speechSynthesis.getVoices() || [];
-        const thai = voices.find(v => /th/i.test(v.lang) || /thai/i.test(v.name));
-        if (thai) u.voice = thai;
-        u.rate = 1.05; u.pitch = 1.6; u.volume = 0.6;
+        const v = pickBestVoice();
+        if (v) { u.voice = v; u.lang = v.lang; }
+        const s = settings();
+        const m = MOOD_TTS[mood] || MOOD_TTS.normal;
+        u.pitch = clamp(m.pitch + (s.ttsPitchBoost || 0), 0.1, 2.0);
+        u.rate = clamp(m.rate * (s.ttsRate || 1.0), 0.5, 2.0);
+        u.volume = s.ttsVolume ?? 0.85;
         window.speechSynthesis.speak(u);
-    } catch (_) { /* noop */ }
+    } catch (_) {}
 }
 
 function vocalize(text, mood) {
     const s = settings();
     if (s.voiceMode === "off") return;
-    if (s.voiceMode === "tts") return speakTTS(text);
-    return chitter(text, mood);
+    if (s.voiceMode === "chitter") return chitter(text, mood);
+    return speakTTS(text, mood);
 }
 
 // ───────────────────────────── DOM ─────────────────────────────
@@ -321,10 +367,13 @@ function destroyPet() {
     if (state.walkTimer) clearTimeout(state.walkTimer);
     if (state.bubbleTimer) clearTimeout(state.bubbleTimer);
     if (state.walkAnim) cancelAnimationFrame(state.walkAnim);
+    cancelLongPress();
     state.pet?.remove();
     state.bubble?.remove();
+    state.panel?.remove();
     state.pet = null;
     state.bubble = null;
+    state.panel = null;
 }
 
 function applyTransform() {
@@ -338,10 +387,8 @@ function applyTransform() {
 function positionBubble() {
     if (!state.bubble || !state.pet) return;
     const s = settings();
-    let bx = state.x + s.size / 2;
-    let by = state.y - 8;
-    state.bubble.style.left = `${bx}px`;
-    state.bubble.style.top = `${by}px`;
+    state.bubble.style.left = `${state.x + s.size / 2}px`;
+    state.bubble.style.top = `${state.y - 8}px`;
     if (state.y < 90) {
         state.bubble.classList.add("hh-bubble-below");
         state.bubble.style.top = `${state.y + s.size + 8}px`;
@@ -350,16 +397,14 @@ function positionBubble() {
     }
 }
 
-// ───────────────────────────── Mood ─────────────────────────────
+// ───────────────────────────── Mood + bubble ─────────────────────────────
 function setMood(mood) {
     if (!SPRITES[mood]) mood = "normal";
     state.mood = mood;
     if (!state.pet) return;
     const sprites = state.pet.querySelectorAll(".hh-sprite");
-    // gentle crossfade by reusing blink anim — just swap src
     sprites[0].src = SPRITES[mood][0];
     sprites[1].src = SPRITES[mood][1];
-
     const c = MOOD_COLORS[mood] || MOOD_COLORS.normal;
     state.bubble.style.setProperty("--hh-border", c.border);
     state.bubble.style.setProperty("--hh-bg", c.bg);
@@ -394,11 +439,10 @@ async function runQueue() {
     }
     state.queueRunning = false;
     state.status = "idle";
-    // settle back to normal mood after a beat (so pet doesn't stay angry forever)
     setTimeout(() => { if (state.status === "idle") setMood("normal"); }, 400);
 }
 
-// ───────────────────────────── Walking — step-by-step animation ─────────────────────────────
+// ───────────────────────────── Walking ─────────────────────────────
 function moveTo(nx, ny, durMs = null) {
     if (!state.pet) return;
     if (state.walkAnim) cancelAnimationFrame(state.walkAnim);
@@ -415,17 +459,14 @@ function moveTo(nx, ny, durMs = null) {
     if (dx > 4) state.facing = "right";
     else if (dx < -4) state.facing = "left";
 
-    // walk speed 75 px/s — feels like real walking
     const speed = 75;
     const dur = durMs ?? clamp((dist / speed) * 1000, 800, 6000);
-
     state.status = "walking";
     state.pet.classList.add("hh-walking");
 
     const startTs = performance.now();
     function step(now) {
         const t = clamp((now - startTs) / dur, 0, 1);
-        // ease in-out so it accelerates and decelerates naturally
         const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
         state.x = sx + dx * eased;
         state.y = sy + dy * eased;
@@ -489,14 +530,95 @@ function maybeAvoidChat() {
     setTimeout(() => moveTo(targetX, targetY), 900);
 }
 
-// ───────────────────────────── Drag / click ─────────────────────────────
+// ───────────────────────────── Long-press ring ─────────────────────────────
+function startLongPress() {
+    cancelLongPress();
+    state.ringStart = performance.now();
+
+    const s = settings();
+    const size = s.size;
+    const ringSize = size + 24;
+    const radius = (ringSize / 2) - 5;
+    const circumference = 2 * Math.PI * radius;
+
+    const svgNs = "http://www.w3.org/2000/svg";
+    state.ring = document.createElementNS(svgNs, "svg");
+    state.ring.setAttribute("class", "hh-ring");
+    state.ring.setAttribute("width", ringSize);
+    state.ring.setAttribute("height", ringSize);
+    state.ring.setAttribute("viewBox", `0 0 ${ringSize} ${ringSize}`);
+    state.ring.style.left = `-12px`;
+    state.ring.style.top = `-12px`;
+
+    const bg = document.createElementNS(svgNs, "circle");
+    bg.setAttribute("cx", ringSize / 2);
+    bg.setAttribute("cy", ringSize / 2);
+    bg.setAttribute("r", radius);
+    bg.setAttribute("fill", "none");
+    bg.setAttribute("stroke", "rgba(215,120,155,.2)");
+    bg.setAttribute("stroke-width", "3");
+
+    const fg = document.createElementNS(svgNs, "circle");
+    fg.setAttribute("class", "hh-ring-fg");
+    fg.setAttribute("cx", ringSize / 2);
+    fg.setAttribute("cy", ringSize / 2);
+    fg.setAttribute("r", radius);
+    fg.setAttribute("fill", "none");
+    fg.setAttribute("stroke", "#d7789b");
+    fg.setAttribute("stroke-width", "4");
+    fg.setAttribute("stroke-linecap", "round");
+    fg.setAttribute("stroke-dasharray", String(circumference));
+    fg.setAttribute("stroke-dashoffset", String(circumference));
+    fg.setAttribute("transform", `rotate(-90 ${ringSize/2} ${ringSize/2})`);
+
+    state.ring.appendChild(bg);
+    state.ring.appendChild(fg);
+    state.pet.appendChild(state.ring);
+
+    function tick() {
+        if (state.ringStart === null) return;
+        const elapsed = performance.now() - state.ringStart;
+        const progress = Math.min(1, elapsed / LONG_PRESS_MS);
+        if (state.ring) {
+            const fgEl = state.ring.querySelector(".hh-ring-fg");
+            if (fgEl) fgEl.setAttribute("stroke-dashoffset", String(circumference * (1 - progress)));
+        }
+        if (progress >= 1) {
+            const rect = state.pet.getBoundingClientRect();
+            fireLongPress(rect.left + rect.width / 2, rect.top + rect.height / 2);
+            return;
+        }
+        state.ringRAF = requestAnimationFrame(tick);
+    }
+    state.ringRAF = requestAnimationFrame(tick);
+}
+
+function cancelLongPress() {
+    if (state.ringRAF) cancelAnimationFrame(state.ringRAF);
+    state.ring?.remove();
+    state.ring = null;
+    state.ringStart = null;
+    state.ringRAF = null;
+}
+
+function fireLongPress(x, y) {
+    state.drag.longPressed = true;
+    state.drag.active = false;
+    state.pet.classList.remove("hh-grabbing");
+    cancelLongPress();
+    if (navigator.vibrate) try { navigator.vibrate([40, 30, 60]); } catch (_) {}
+    togglePanel(x, y);
+}
+
+// ───────────────────────────── Drag / click / long-press ─────────────────────────────
 function bindInputs() {
     const onDown = (e) => {
-        unlockAudio(); // unlock on first user interaction
+        unlockAudio();
         const ev = e.touches ? e.touches[0] : e;
         e.preventDefault();
         state.drag.active = true;
         state.drag.moved = false;
+        state.drag.longPressed = false;
         state.drag.downAt = Date.now();
         const rect = state.pet.getBoundingClientRect();
         state.drag.ox = ev.clientX - rect.left;
@@ -504,18 +626,19 @@ function bindInputs() {
         state.drag.sx = ev.clientX;
         state.drag.sy = ev.clientY;
         state.pet.classList.add("hh-grabbing");
-        // cancel any walk
         if (state.walkAnim) cancelAnimationFrame(state.walkAnim);
         state.pet.classList.remove("hh-walking");
+        startLongPress();
     };
     const onMove = (e) => {
         if (!state.drag.active) return;
         const ev = e.touches ? e.touches[0] : e;
         const dx = ev.clientX - state.drag.sx;
         const dy = ev.clientY - state.drag.sy;
-        if (!state.drag.moved && Math.hypot(dx, dy) > 5) {
+        if (!state.drag.moved && Math.hypot(dx, dy) > 8) {
             state.drag.moved = true;
             state.status = "dragging";
+            cancelLongPress();
             sayQueued(pickOne(LINES.drag), "tense", 2500);
         }
         if (state.drag.moved) {
@@ -525,18 +648,26 @@ function bindInputs() {
         }
     };
     const onUp = () => {
+        cancelLongPress();
+        if (state.drag.longPressed) {
+            state.drag.longPressed = false;
+            state.drag.active = false;
+            return;
+        }
         if (!state.drag.active) return;
         const wasClick = !state.drag.moved && Date.now() - state.drag.downAt < 350;
         state.drag.active = false;
         state.pet.classList.remove("hh-grabbing");
         if (wasClick) {
             handleClick();
-        } else {
+        } else if (state.drag.moved) {
             state.status = "idle";
             const s = settings();
             s.posX = state.x;
             s.posY = state.y;
             save();
+        } else {
+            state.status = "idle";
         }
     };
 
@@ -546,23 +677,14 @@ function bindInputs() {
     window.addEventListener("touchmove", onMove, { passive: false });
     window.addEventListener("mouseup", onUp);
     window.addEventListener("touchend", onUp);
+    window.addEventListener("touchcancel", onUp);
 
     state.pet.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         unlockAudio();
+        cancelLongPress();
         togglePanel(e.clientX, e.clientY);
     });
-
-    // long-press for mobile (open panel)
-    let longPress;
-    state.pet.addEventListener("touchstart", (e) => {
-        longPress = setTimeout(() => {
-            const t = e.touches[0];
-            togglePanel(t.clientX, t.clientY);
-        }, 700);
-    }, { passive: true });
-    state.pet.addEventListener("touchend", () => clearTimeout(longPress));
-    state.pet.addEventListener("touchmove", () => clearTimeout(longPress));
 
     window.addEventListener("resize", () => {
         const s = settings();
@@ -608,13 +730,10 @@ function processMessage(messageId) {
         const mesDom = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
         if (mesDom) {
             mesDom.querySelectorAll("div").forEach(div => {
-                if (/แฮมแฮม\s*·/.test(div.textContent || "")) {
-                    div.style.display = "none";
-                }
+                if (/แฮมแฮม\s*·/.test(div.textContent || "")) div.style.display = "none";
             });
         }
     }
-
     for (const m of matches) {
         const mood = (m[1] || "normal").toLowerCase();
         const text = (m[2] || "").trim().replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
@@ -626,37 +745,64 @@ function processMessage(messageId) {
 function togglePanel(x, y) {
     if (state.panel) { state.panel.remove(); state.panel = null; return; }
     const s = settings();
+    const voices = loadVoices();
+    const voiceOptions = voices.length
+        ? `<option value="">🎲 อัตโนมัติ (เลือกเสียงไทยที่ดีที่สุด)</option>` +
+          voices.map(v => {
+              const isThai = /th/i.test(v.lang);
+              const label = `${isThai ? "🇹🇭 " : ""}${v.name} (${v.lang})`;
+              const safe = label.replace(/</g, "&lt;");
+              return `<option value="${v.name.replace(/"/g, "&quot;")}" ${v.name===s.ttsVoice?"selected":""}>${safe}</option>`;
+          }).join("")
+        : `<option value="">⏳ กำลังโหลดเสียง... ลองปิด-เปิดเมนูใหม่</option>`;
+
     const p = document.createElement("div");
     p.id = "hh-panel";
     p.innerHTML = `
         <div class="hh-panel-title">🌸 แฮมๆ Buddy</div>
+
+        <div class="hh-section">⚙️ ทั่วไป</div>
         <label class="hh-row"><span>เปิดใช้งาน</span><input type="checkbox" data-k="enabled" ${s.enabled?"checked":""}></label>
         <label class="hh-row"><span>ดักแท็ก &lt;ham&gt;</span><input type="checkbox" data-k="interceptHam" ${s.interceptHam?"checked":""}></label>
         <label class="hh-row"><span>ซ่อน bubble จาก regex</span><input type="checkbox" data-k="hideRegexBubble" ${s.hideRegexBubble?"checked":""}></label>
         <label class="hh-row"><span>หลบข้อความ</span><input type="checkbox" data-k="avoidChat" ${s.avoidChat?"checked":""}></label>
         <label class="hh-row"><span>พึมพำตอนว่าง</span><input type="checkbox" data-k="idleChatter" ${s.idleChatter?"checked":""}></label>
-        <label class="hh-row hh-col"><span>เสียง</span>
+        <label class="hh-row"><span>ขนาด <span class="hh-val">${s.size}px</span></span><input type="range" min="48" max="160" step="4" data-k="size" value="${s.size}"></label>
+        <label class="hh-row"><span>ช่วงเดิน <span class="hh-val">${s.walkInterval}s</span></span><input type="range" min="3" max="30" step="1" data-k="walkInterval" value="${s.walkInterval}"></label>
+
+        <div class="hh-section">🎙️ เสียง</div>
+        <label class="hh-row hh-col"><span>โหมดเสียง</span>
             <select data-k="voiceMode">
-                <option value="chitter" ${s.voiceMode==="chitter"?"selected":""}>🐹 เสียงแฮม (ปี๊ๆ)</option>
-                <option value="tts" ${s.voiceMode==="tts"?"selected":""}>📢 อ่านออกเสียง (TTS)</option>
+                <option value="tts" ${s.voiceMode==="tts"?"selected":""}>📢 พูดออกเสียง (TTS)</option>
+                <option value="chitter" ${s.voiceMode==="chitter"?"selected":""}>🐹 เสียงปี๊ๆ (chitter)</option>
                 <option value="off" ${s.voiceMode==="off"?"selected":""}>🔇 ปิดเสียง</option>
             </select>
         </label>
-        <label class="hh-row"><span>เสียงดัง <span class="hh-val">${Math.round(s.chitterVolume*100)}%</span></span><input type="range" min="0" max="50" step="2" data-k="chitterVolume" value="${s.chitterVolume*100}"></label>
-        <label class="hh-row"><span>ขนาด <span class="hh-val">${s.size}px</span></span><input type="range" min="48" max="160" step="4" data-k="size" value="${s.size}"></label>
-        <label class="hh-row"><span>ช่วงเดิน <span class="hh-val">${s.walkInterval}s</span></span><input type="range" min="3" max="30" step="1" data-k="walkInterval" value="${s.walkInterval}"></label>
-        <div class="hh-row hh-mood-row">
-            <span>ลอง mood:</span>
-            <div class="hh-moods">
-                ${Object.keys(SPRITES).map(m => `<button data-mood="${m}">${m}</button>`).join("")}
-            </div>
+        <div class="hh-tts-block" style="display:${s.voiceMode==="tts"?"block":"none"}">
+            <label class="hh-row hh-col"><span>เสียงพูด (เลือกได้!)</span>
+                <select data-k="ttsVoice">${voiceOptions}</select>
+            </label>
+            <label class="hh-row"><span>เสียงสูงเพิ่ม <span class="hh-val">${s.ttsPitchBoost>=0?"+":""}${s.ttsPitchBoost.toFixed(2)}</span></span><input type="range" min="-50" max="25" step="5" data-k="ttsPitchBoost" value="${s.ttsPitchBoost*100}"></label>
+            <label class="hh-row"><span>ความเร็ว <span class="hh-val">${s.ttsRate.toFixed(2)}x</span></span><input type="range" min="60" max="140" step="5" data-k="ttsRate" value="${s.ttsRate*100}"></label>
+            <label class="hh-row"><span>ความดัง <span class="hh-val">${Math.round(s.ttsVolume*100)}%</span></span><input type="range" min="0" max="100" step="5" data-k="ttsVolume" value="${s.ttsVolume*100}"></label>
+            <button class="hh-test-btn">▶️ ทดสอบเสียง</button>
         </div>
-        <div class="hh-row"><button class="hh-close">ปิดเมนู</button></div>
+        <div class="hh-chitter-block" style="display:${s.voiceMode==="chitter"?"block":"none"}">
+            <label class="hh-row"><span>ดังเสียงปี๊ <span class="hh-val">${Math.round(s.chitterVolume*100)}%</span></span><input type="range" min="0" max="50" step="2" data-k="chitterVolume" value="${s.chitterVolume*100}"></label>
+            <button class="hh-test-btn">▶️ ทดสอบเสียง</button>
+        </div>
+
+        <div class="hh-section">✨ ลอง mood</div>
+        <div class="hh-moods">
+            ${Object.keys(SPRITES).map(m => `<button data-mood="${m}">${m}</button>`).join("")}
+        </div>
+
+        <button class="hh-close">ปิดเมนู</button>
     `;
     document.body.appendChild(p);
     state.panel = p;
-    const px = clamp(x, 8, window.innerWidth - 280);
-    const py = clamp(y, 8, window.innerHeight - 460);
+    const px = clamp(x - 135, 8, window.innerWidth - 290);
+    const py = clamp(y - 50, 8, window.innerHeight - 580);
     p.style.left = `${px}px`;
     p.style.top = `${py}px`;
 
@@ -666,14 +812,16 @@ function togglePanel(x, y) {
             const cur = settings();
             if (inp.type === "checkbox") cur[k] = inp.checked;
             else if (inp.type === "range") {
-                let v = parseInt(inp.value, 10);
-                if (k === "chitterVolume") v = v / 100;
+                let v = parseFloat(inp.value);
+                if (k === "ttsPitchBoost" || k === "ttsRate" || k === "ttsVolume" || k === "chitterVolume") v = v / 100;
                 cur[k] = v;
                 const valEl = inp.parentElement.querySelector(".hh-val");
                 if (valEl) {
-                    if (k === "chitterVolume") valEl.textContent = `${Math.round(v*100)}%`;
-                    else if (k === "size") valEl.textContent = `${v}px`;
+                    if (k === "size") valEl.textContent = `${v}px`;
                     else if (k === "walkInterval") valEl.textContent = `${v}s`;
+                    else if (k === "ttsPitchBoost") valEl.textContent = `${v>=0?"+":""}${v.toFixed(2)}`;
+                    else if (k === "ttsRate") valEl.textContent = `${v.toFixed(2)}x`;
+                    else valEl.textContent = `${Math.round(v*100)}%`;
                 }
                 if (k === "size" && state.pet) {
                     state.pet.style.width = `${v}px`;
@@ -681,6 +829,10 @@ function togglePanel(x, y) {
                 }
             } else if (inp.tagName === "SELECT") {
                 cur[k] = inp.value;
+                if (k === "voiceMode") {
+                    p.querySelector(".hh-tts-block").style.display = cur[k] === "tts" ? "block" : "none";
+                    p.querySelector(".hh-chitter-block").style.display = cur[k] === "chitter" ? "block" : "none";
+                }
             }
             save();
             if (k === "enabled") {
@@ -689,8 +841,19 @@ function togglePanel(x, y) {
             }
         });
     });
+    p.querySelectorAll(".hh-test-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            unlockAudio();
+            const sample = pickOne(["สวัสดีค่า แฮมๆ มาแล้วน้า", "พี่จ๋า คิดถึงเลยน้า", "เย้! ได้ทดสอบเสียงแล้ว", "ทดสอบ ทดสอบ ฮัลโหลล!"]);
+            setMood("happy");
+            showBubble(sample, 3500);
+            vocalize(sample, "happy");
+        });
+    });
     p.querySelectorAll("[data-mood]").forEach(b => {
-        b.addEventListener("click", () => {
+        b.addEventListener("click", (e) => {
+            e.stopPropagation();
             unlockAudio();
             sayQueued(`mood: ${b.dataset.mood} ✨`, b.dataset.mood, 2500);
         });
@@ -719,7 +882,6 @@ function boot() {
     eventSource.on(event_types.MESSAGE_SWIPED, processMessage);
     eventSource.on(event_types.MESSAGE_EDITED, processMessage);
 
-    // unlock audio on any first interaction with the page
     const unlocker = () => {
         unlockAudio();
         document.removeEventListener("click", unlocker);
