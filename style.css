@@ -1,4 +1,4 @@
-/* 🌸 HamHam Buddy v2 styles */
+/* 🌸 HamHam Buddy v3 styles */
 
 @import url('https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&display=swap');
 
@@ -40,11 +40,9 @@
     user-drag: none;
 }
 
-/* IDLE: gentle bob + occasional blink (frame_b shows briefly) */
+/* IDLE: gentle bob + occasional blink */
 .hh-frame-a { animation: hh-blink-a 5.5s ease-in-out infinite, hh-bob 2.4s ease-in-out infinite; }
 .hh-frame-b { animation: hh-blink-b 5.5s ease-in-out infinite, hh-bob 2.4s ease-in-out infinite; }
-
-/* Blink only ~5% of the cycle — natural blink, not flashing */
 @keyframes hh-blink-a {
     0%, 92% { opacity: 1; }
     94%, 97% { opacity: 0; }
@@ -60,7 +58,7 @@
     50% { translate: 0 -3px; }
 }
 
-/* WALKING: faster bouncy step + slight tilt */
+/* WALKING: bouncy step with tilt */
 #hh-pet.hh-walking .hh-frame-a,
 #hh-pet.hh-walking .hh-frame-b {
     animation: hh-walk-bounce .42s ease-in-out infinite, hh-walk-tilt .42s ease-in-out infinite;
@@ -82,6 +80,22 @@
     50%  { transform: scaleX(var(--flip)) translateY(0) scale(1.15, .85); }
     75%  { transform: scaleX(var(--flip)) translateY(-6px) rotate(4deg); }
     100% { transform: scaleX(var(--flip)) translateY(0); }
+}
+
+/* ─────────────── Long-press progress ring ─────────────── */
+.hh-ring {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    animation: hh-ring-fadein 0.35s ease 0.15s forwards;
+    filter: drop-shadow(0 2px 6px rgba(215,120,155,.4));
+}
+@keyframes hh-ring-fadein {
+    to { opacity: 1; }
+}
+.hh-ring-fg {
+    transition: stroke-dashoffset 0.05s linear;
 }
 
 /* ─────────────── Speech bubble ─────────────── */
@@ -152,7 +166,7 @@
 /* ─────────────── Settings panel ─────────────── */
 #hh-panel {
     position: fixed;
-    width: 270px;
+    width: 280px;
     background: linear-gradient(160deg, #fff5f9 0%, #ffe0ec 100%);
     border: 2.5px solid #d7789b;
     border-radius: 22px;
@@ -167,58 +181,98 @@
     overflow-y: auto;
 }
 .hh-panel-title {
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 700;
-    margin-bottom: 10px;
+    margin-bottom: 4px;
     text-align: center;
     letter-spacing: .02em;
     color: #a83d62;
+}
+.hh-section {
+    font-size: 12px;
+    font-weight: 700;
+    color: #a83d62;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(215, 120, 155, .3);
+    letter-spacing: .02em;
 }
 .hh-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 6px 2px;
-    border-bottom: 1px dashed rgba(215, 120, 155, .3);
+    padding: 5px 2px;
 }
-.hh-row:last-child { border-bottom: none; }
 .hh-row.hh-col { flex-direction: column; align-items: stretch; gap: 4px; }
-.hh-row .hh-val { font-weight: 700; color: #a83d62; }
+.hh-row .hh-val {
+    font-weight: 700;
+    color: #a83d62;
+    background: rgba(255,255,255,.6);
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    margin-left: 4px;
+}
+.hh-row > span:first-child {
+    flex: 1;
+    min-width: 0;
+}
 .hh-row input[type="checkbox"] {
     accent-color: #d7789b;
     width: 17px;
     height: 17px;
     cursor: pointer;
+    flex-shrink: 0;
 }
 .hh-row input[type="range"] {
     accent-color: #d7789b;
     width: 110px;
     cursor: pointer;
+    flex-shrink: 0;
 }
 .hh-row select {
     background: white;
     border: 1.5px solid #d7789b;
     border-radius: 10px;
-    padding: 5px 8px;
+    padding: 6px 8px;
     font-family: inherit;
     font-size: 12px;
     color: #5a2240;
     cursor: pointer;
     width: 100%;
+    font-weight: 600;
 }
-.hh-mood-row { flex-direction: column; align-items: stretch; }
+.hh-test-btn {
+    width: 100%;
+    padding: 7px;
+    margin-top: 8px;
+    background: white;
+    color: #a83d62;
+    border: 2px solid #d7789b;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s ease;
+}
+.hh-test-btn:hover {
+    background: #d7789b;
+    color: white;
+}
 .hh-moods {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 5px;
-    margin-top: 6px;
+    margin-top: 4px;
 }
 .hh-moods button {
     background: white;
     border: 1.5px solid #d7789b;
     border-radius: 10px;
-    padding: 5px 2px;
+    padding: 6px 2px;
     font-size: 11px;
     color: #a83d62;
     cursor: pointer;
@@ -233,15 +287,15 @@
 }
 #hh-panel .hh-close {
     width: 100%;
-    padding: 8px;
+    padding: 9px;
     background: #d7789b;
     color: white;
     border: none;
     border-radius: 12px;
     font-weight: 700;
-    font-size: 13px;
+    font-size: 14px;
     cursor: pointer;
     font-family: inherit;
-    margin-top: 4px;
+    margin-top: 12px;
 }
 #hh-panel .hh-close:hover { background: #b85e7d; }
