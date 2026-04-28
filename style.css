@@ -1,4 +1,4 @@
-/* 🌸 HamHam Buddy v3 styles */
+/* 🌸 HamHam Buddy v5 styles */
 
 @import url('https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&display=swap');
 
@@ -58,31 +58,30 @@
     50% { translate: 0 -3px; }
 }
 
-/* WALKING: bouncy step with tilt */
+/* WALKING: gentle bob only — no more tilting/hopping! */
 #hh-pet.hh-walking .hh-frame-a,
 #hh-pet.hh-walking .hh-frame-b {
-    animation: hh-walk-bounce .42s ease-in-out infinite, hh-walk-tilt .42s ease-in-out infinite;
+    animation: hh-blink-a 5.5s ease-in-out infinite, hh-walk-bob .7s ease-in-out infinite;
 }
-@keyframes hh-walk-bounce {
+#hh-pet.hh-walking .hh-frame-b {
+    animation: hh-blink-b 5.5s ease-in-out infinite, hh-walk-bob .7s ease-in-out infinite;
+}
+@keyframes hh-walk-bob {
     0%, 100% { translate: 0 0; }
-    50% { translate: 0 -7px; }
-}
-@keyframes hh-walk-tilt {
-    0%, 100% { rotate: -3deg; }
-    50% { rotate: 3deg; }
+    50% { translate: 0 -3px; }
 }
 
 /* CLICK BOUNCE */
 #hh-pet.hh-bounce .hh-inner { animation: hh-bounce .55s cubic-bezier(.36,.07,.19,.97); }
 @keyframes hh-bounce {
     0%   { transform: scaleX(var(--flip)) translateY(0); }
-    25%  { transform: scaleX(var(--flip)) translateY(-14px) rotate(-6deg); }
-    50%  { transform: scaleX(var(--flip)) translateY(0) scale(1.15, .85); }
-    75%  { transform: scaleX(var(--flip)) translateY(-6px) rotate(4deg); }
+    25%  { transform: scaleX(var(--flip)) translateY(-12px) rotate(-4deg); }
+    50%  { transform: scaleX(var(--flip)) translateY(0) scale(1.12, .88); }
+    75%  { transform: scaleX(var(--flip)) translateY(-4px) rotate(3deg); }
     100% { transform: scaleX(var(--flip)) translateY(0); }
 }
 
-/* ─────────────── Long-press progress ring ─────────────── */
+/* Long-press progress ring */
 .hh-ring {
     position: absolute;
     pointer-events: none;
@@ -91,14 +90,10 @@
     animation: hh-ring-fadein 0.35s ease 0.15s forwards;
     filter: drop-shadow(0 2px 6px rgba(215,120,155,.4));
 }
-@keyframes hh-ring-fadein {
-    to { opacity: 1; }
-}
-.hh-ring-fg {
-    transition: stroke-dashoffset 0.05s linear;
-}
+@keyframes hh-ring-fadein { to { opacity: 1; } }
+.hh-ring-fg { transition: stroke-dashoffset 0.05s linear; }
 
-/* ─────────────── Speech bubble ─────────────── */
+/* Speech bubble */
 #hh-bubble {
     position: fixed;
     --hh-border: #d7789b;
@@ -124,10 +119,7 @@
     word-break: break-word;
     letter-spacing: .01em;
 }
-#hh-bubble.hh-visible {
-    opacity: 1;
-    transform: translate(-50%, -100%) scale(1);
-}
+#hh-bubble.hh-visible { opacity: 1; transform: translate(-50%, -100%) scale(1); }
 #hh-bubble::before, #hh-bubble::after {
     content: '';
     position: absolute;
@@ -143,12 +135,8 @@
     border-top-color: var(--hh-bg);
     border-width: 8px;
 }
-#hh-bubble.hh-bubble-below {
-    transform: translate(-50%, 0) scale(.6);
-}
-#hh-bubble.hh-bubble-below.hh-visible {
-    transform: translate(-50%, 0) scale(1);
-}
+#hh-bubble.hh-bubble-below { transform: translate(-50%, 0) scale(.6); }
+#hh-bubble.hh-bubble-below.hh-visible { transform: translate(-50%, 0) scale(1); }
 #hh-bubble.hh-bubble-below::before,
 #hh-bubble.hh-bubble-below::after {
     bottom: auto;
@@ -163,10 +151,10 @@
     border-width: 8px;
 }
 
-/* ─────────────── Settings panel ─────────────── */
+/* Settings panel */
 #hh-panel {
     position: fixed;
-    width: 280px;
+    width: 290px;
     background: linear-gradient(160deg, #fff5f9 0%, #ffe0ec 100%);
     border: 2.5px solid #d7789b;
     border-radius: 22px;
@@ -185,7 +173,6 @@
     font-weight: 700;
     margin-bottom: 4px;
     text-align: center;
-    letter-spacing: .02em;
     color: #a83d62;
 }
 .hh-section {
@@ -196,7 +183,6 @@
     margin-bottom: 4px;
     padding-bottom: 4px;
     border-bottom: 2px solid rgba(215, 120, 155, .3);
-    letter-spacing: .02em;
 }
 .hh-row {
     display: flex;
@@ -215,10 +201,7 @@
     font-size: 11px;
     margin-left: 4px;
 }
-.hh-row > span:first-child {
-    flex: 1;
-    min-width: 0;
-}
+.hh-row > span:first-child { flex: 1; min-width: 0; }
 .hh-row input[type="checkbox"] {
     accent-color: #d7789b;
     width: 17px;
@@ -232,6 +215,23 @@
     cursor: pointer;
     flex-shrink: 0;
 }
+.hh-row input[type="text"], .hh-row input[type="password"], .hh-row textarea {
+    background: white;
+    border: 1.5px solid #d7789b;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-family: 'Mali', 'Sarabun', system-ui, sans-serif;
+    font-size: 12px;
+    color: #5a2240;
+    width: 100%;
+}
+.hh-row textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+}
 .hh-row select {
     background: white;
     border: 1.5px solid #d7789b;
@@ -244,6 +244,39 @@
     width: 100%;
     font-weight: 600;
 }
+.hh-info {
+    background: rgba(255, 255, 255, .55);
+    border: 1.5px dashed #d7789b;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #6a3050;
+    margin: 8px 0 6px;
+}
+.hh-info a { color: #a83d62; text-decoration: underline; font-weight: 700; }
+.hh-info code {
+    background: rgba(215,120,155,.15);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 10px;
+}
+.hh-fetch-voices {
+    width: 100%;
+    padding: 7px;
+    margin: 4px 0;
+    background: #fff;
+    color: #a83d62;
+    border: 1.5px solid #d7789b;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.hh-fetch-voices:hover { background: #d7789b; color: white; }
+.hh-fetch-voices:disabled { opacity: .6; cursor: wait; }
 .hh-test-btn {
     width: 100%;
     padding: 7px;
@@ -256,12 +289,8 @@
     font-size: 13px;
     cursor: pointer;
     font-family: inherit;
-    transition: all .15s ease;
 }
-.hh-test-btn:hover {
-    background: #d7789b;
-    color: white;
-}
+.hh-test-btn:hover { background: #d7789b; color: white; }
 .hh-moods {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -278,13 +307,8 @@
     cursor: pointer;
     font-weight: 600;
     font-family: inherit;
-    transition: all .15s ease;
 }
-.hh-moods button:hover {
-    background: #d7789b;
-    color: white;
-    transform: translateY(-1px);
-}
+.hh-moods button:hover { background: #d7789b; color: white; transform: translateY(-1px); }
 #hh-panel .hh-close {
     width: 100%;
     padding: 9px;
