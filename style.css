@@ -80,7 +80,7 @@
     100% { transform: scaleX(var(--flip)) translateY(0); }
 }
 
-/* RPS: KNOCKOUT — fall over, lying on back with stars */
+/* RPS: KNOCKOUT — fall over, lying on back */
 #hh-pet.hh-knockout .hh-inner {
     animation: hh-knockout 1s cubic-bezier(.36,.07,.19,.97) forwards, hh-knockout-shake .15s ease-in-out 1s 3;
 }
@@ -94,29 +94,6 @@
 @keyframes hh-knockout-shake {
     0%, 100% { translate: 0 0; }
     50% { translate: 2px 0; }
-}
-#hh-pet.hh-knockout::before {
-    content: "💫 ⭐ 💫";
-    position: absolute;
-    top: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 16px;
-    animation: hh-stars-spin 1.5s linear infinite;
-    z-index: 2;
-    opacity: 0;
-    animation-delay: 0.8s;
-    animation-fill-mode: forwards;
-}
-#hh-pet.hh-knockout::before {
-    animation: hh-stars-fadein .3s ease .8s forwards, hh-stars-spin 1.8s linear 1.1s infinite;
-}
-@keyframes hh-stars-fadein {
-    to { opacity: 1; }
-}
-@keyframes hh-stars-spin {
-    0%   { transform: translateX(-50%) rotate(0deg); }
-    100% { transform: translateX(-50%) rotate(360deg); }
 }
 
 /* RPS: CELEBRATE — happy hop with sparkles */
@@ -217,12 +194,13 @@
 /* ─────────────── RPS Mini-game modal ─────────────── */
 #hh-rps {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     z-index: 10001;
     background: rgba(60, 25, 45, 0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     animation: hh-rps-bg-in .25s ease;
@@ -233,6 +211,9 @@
     to { opacity: 1; }
 }
 .hh-rps-card {
+    position: fixed;
+    top: 50%;
+    left: 50%;
     background: linear-gradient(160deg, #fff5f9 0%, #ffd9e8 100%);
     border: 3px solid #d7789b;
     border-radius: 24px;
@@ -240,11 +221,11 @@
     width: min(340px, 90vw);
     text-align: center;
     box-shadow: 0 18px 50px rgba(215, 120, 155, .55), 0 2px 0 rgba(255, 255, 255, .9) inset;
-    animation: hh-rps-card-in .45s cubic-bezier(.34, 1.56, .64, 1);
+    animation: hh-rps-card-in .45s cubic-bezier(.34, 1.56, .64, 1) forwards;
 }
 @keyframes hh-rps-card-in {
-    from { opacity: 0; transform: scale(.5) translateY(40px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
+    from { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 .hh-rps-title {
     font-size: 24px;
@@ -570,6 +551,60 @@
     font-family: inherit;
 }
 .hh-moods button:hover { background: #d7789b; color: white; transform: translateY(-1px); }
+
+/* Speech history */
+.hh-history {
+    max-height: 220px;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, .35);
+    border-radius: 12px;
+    padding: 6px;
+    border: 1.5px dashed rgba(215, 120, 155, .35);
+}
+.hh-history::-webkit-scrollbar { width: 6px; }
+.hh-history::-webkit-scrollbar-thumb { background: #d7789b; border-radius: 3px; }
+.hh-history::-webkit-scrollbar-track { background: transparent; }
+.hh-history-empty {
+    text-align: center;
+    font-size: 11px;
+    color: #a83d62;
+    padding: 12px;
+    opacity: .7;
+}
+.hh-history-item {
+    background: white;
+    border-left: 3px solid #d7789b;
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+    animation: hh-history-in .3s ease;
+}
+.hh-history-item:last-child { margin-bottom: 0; }
+@keyframes hh-history-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.hh-history-text {
+    color: #5a2240;
+    font-weight: 600;
+    word-break: break-word;
+}
+.hh-history-meta {
+    font-size: 10px;
+    color: #a83d62;
+    opacity: .65;
+    margin-top: 2px;
+    font-weight: 500;
+}
+.hh-history-item.hh-mood-happy    { border-left-color: #dcb630; }
+.hh-history-item.hh-mood-angry    { border-left-color: #da5864; }
+.hh-history-item.hh-mood-tense    { border-left-color: #986ce4; }
+.hh-history-item.hh-mood-curious  { border-left-color: #30bc98; }
+.hh-history-item.hh-mood-scheming { border-left-color: #c060d8; }
+.hh-history-item.hh-mood-sad      { border-left-color: #7090c8; }
+.hh-history-item.hh-mood-nsfw     { border-left-color: #d7789b; }
 #hh-panel .hh-close {
     width: 100%;
     padding: 9px;
