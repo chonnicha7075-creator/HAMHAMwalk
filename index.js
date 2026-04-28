@@ -996,14 +996,26 @@ function showRPSUI() {
     rps.querySelectorAll("button[data-c]").forEach(b => {
         b.addEventListener("click", () => {
             const userPick = b.dataset.c;
-            // Rigged AI: ham wins ~55%, ties ~25%, user wins ~20%
-            // Ham peeks at user's pick and chooses cleverly 😈
             const counter = { rock: "paper", paper: "scissors", scissors: "rock" };
+
+            // Pick weighted outcome
             const r = Math.random();
             let hamPick;
-            if (r < 0.55)      hamPick = counter[userPick];   // ham counters → ham wins
-            else if (r < 0.80) hamPick = userPick;            // ham mirrors → tie
-            else               hamPick = counter[counter[userPick]]; // user wins
+            if (r < 0.50)      hamPick = counter[userPick];           // ham wins (50%)
+            else if (r < 0.75) hamPick = userPick;                     // tie (25%)
+            else if (r < 0.90) hamPick = counter[counter[userPick]];   // user wins (15%)
+            else hamPick = ["rock", "paper", "scissors"][Math.floor(Math.random() * 3)]; // chaos (10%)
+
+            // Anti-repeat: if ham just picked the same thing twice in a row, force variety
+            state.recentHamPicks = state.recentHamPicks || [];
+            const recent = state.recentHamPicks;
+            if (recent.length >= 2 && recent[recent.length-1] === hamPick && recent[recent.length-2] === hamPick) {
+                const others = ["rock", "paper", "scissors"].filter(x => x !== hamPick);
+                hamPick = others[Math.floor(Math.random() * others.length)];
+            }
+            recent.push(hamPick);
+            if (recent.length > 5) recent.shift();
+
             revealRPS(rps, hamPick, userPick);
         });
     });
