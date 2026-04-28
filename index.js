@@ -1,9 +1,7 @@
-// 🌸 HamHam Buddy v5
-// - Voice OFF by default (no more annoying robot/beep sounds)
-// - Real voice options: ElevenLabs (cloning) or Custom audio URLs (your own MP3s)
-// - Bubble waits for speech to finish — no more cut-off sentences
-// - Gentle walk animation (no more tilting/hopping)
-// - Cleaned Thai (typo fixes)
+// 🌸 HamHam Buddy v6
+// - Removed "wave" mood
+// - Rock-Paper-Scissors mini-game on 3 rapid clicks (with cute knockout/celebrate animations)
+// - X close button on settings popup
 
 import { eventSource, event_types, saveSettingsDebounced } from "../../../../script.js";
 import { extension_settings, getContext } from "../../../extensions.js";
@@ -11,10 +9,9 @@ import { extension_settings, getContext } from "../../../extensions.js";
 const MODULE = "HamHamBuddy";
 const LONG_PRESS_MS = 5000;
 
-// ───────────────────────────── Sprite map ─────────────────────────────
+// ───────────────────────────── Sprite map (no wave) ─────────────────────────────
 const SPRITES = {
     normal:   ["https://i.postimg.cc/Z5YwyMGd/1000040832_removebg_preview.png", "https://i.postimg.cc/vHtPTsN4/1000040824_removebg_preview.png"],
-    wave:     ["https://i.postimg.cc/Y0sv35Jk/1000040953-Picsart-Background-Remover.gif", "https://i.postimg.cc/Z5YwyMGd/1000040832_removebg_preview.png"],
     happy:    ["https://i.postimg.cc/sgfTZNkY/1000040841_removebg_preview.png", "https://i.postimg.cc/Z5YwyMGd/1000040832_removebg_preview.png"],
     angry:    ["https://i.postimg.cc/TYJk164W/1000040831_removebg_preview.png", "https://i.postimg.cc/3JFLNTcy/1000040823_removebg_preview.png"],
     tense:    ["https://i.postimg.cc/CxMcfQ3k/1000040833_removebg_preview.png", "https://i.postimg.cc/vHtPTsN4/1000040824_removebg_preview.png"],
@@ -26,7 +23,6 @@ const SPRITES = {
 
 const MOOD_COLORS = {
     normal:   { border: "#d7789b", bg: "#fff5f9" },
-    wave:     { border: "#e89162", bg: "#fff3eb" },
     happy:    { border: "#dcb630", bg: "#fff9e0" },
     angry:    { border: "#da5864", bg: "#ffeef0" },
     tense:    { border: "#986ce4", bg: "#f4ecff" },
@@ -37,8 +33,7 @@ const MOOD_COLORS = {
 };
 
 const MOOD_TTS = {
-    happy:    { pitch: 2.0, rate: 1.05 },
-    wave:     { pitch: 1.95, rate: 1.0 },
+    happy:    { pitch: 2.0,  rate: 1.05 },
     curious:  { pitch: 1.85, rate: 1.0 },
     normal:   { pitch: 1.75, rate: 0.97 },
     nsfw:     { pitch: 1.7,  rate: 0.93 },
@@ -50,7 +45,6 @@ const MOOD_TTS = {
 
 const MOOD_ELEVEN = {
     happy:    { stability: 0.30, similarity_boost: 0.75, style: 0.65 },
-    wave:     { stability: 0.35, similarity_boost: 0.75, style: 0.55 },
     curious:  { stability: 0.40, similarity_boost: 0.75, style: 0.45 },
     normal:   { stability: 0.50, similarity_boost: 0.75, style: 0.30 },
     nsfw:     { stability: 0.45, similarity_boost: 0.80, style: 0.40 },
@@ -60,7 +54,7 @@ const MOOD_ELEVEN = {
     sad:      { stability: 0.45, similarity_boost: 0.80, style: 0.40 },
 };
 
-// ───────────────────────────── Lines (cleaned, no typos) ─────────────────────────────
+// ───────────────────────────── Lines ─────────────────────────────
 const LINES = {
     click: [
         "โอ้ย ทำหนูทำไมเนี่ย",
@@ -85,7 +79,6 @@ const LINES = {
         "พี่ หนูจะร้องบอกแม่มุนะ",
         "ใจร้ายมากเลยรู้มั้ย",
         "ไม่ปั่นด้วยแล้ว ไปแล้ว ฮึ่ง",
-        "บอกแล้วไงว่าหยุด ไม่ฟังเลย",
     ],
     clickSad: [
         "หนูร้องไห้แล้วน้า",
@@ -93,8 +86,6 @@ const LINES = {
         "หนูไปอยู่คนเดียวดีกว่า",
         "พี่ไม่รักหนูแล้วเหรอ",
         "หนูเจ็บจริงๆ น้า",
-        "ไม่อยากเล่นกับพี่อีกแล้ว",
-        "หนูทำอะไรผิดเหรอ ทำไมแกล้งกัน",
     ],
     drag: [
         "พี่จะมาลากหนูไปไหน ฟ้องแม่มุแน่",
@@ -109,7 +100,6 @@ const LINES = {
         "พี่จะพาหนูไปไหนเหรอ ไปกินบ๊วยมั้ย",
         "ระวังด้วยนะ หนูเปราะบาง",
         "ใครก็ได้ช่วยหนูที",
-        "ทำไมต้องลากด้วยอ่ะ",
     ],
     blocking: [
         "บังข้อความดีกว่า อิอิ ไม่เห็นแล้ว",
@@ -148,12 +138,35 @@ const LINES = {
         "เย้ ได้เจอพี่แล้ว",
         "ตื่นแล้วน้าาา",
         "วันนี้พร้อมแล้วค่า",
-        "ฮายยย พี่ คิดถึงสุดๆ เลย",
     ],
 };
 
-// Map from category → key in LINES
-const LINE_CATEGORIES = ["click", "clickAngry", "clickSad", "drag", "blocking", "idle", "greeting"];
+// RPS lines
+const RPS_CHALLENGE = [
+    "อ๊ะ กล้าจิ้มหนูเหรอ เป่ายิงฉุบเลย!",
+    "หนูท้า! เป่ายิงฉุบ พี่กล้าไหม",
+    "อ้าว มาแบบนี้เลย เป่ายิงฉุบเลยยย",
+    "หนูจะเอาคืน เป่ายิงฉุบกัน",
+];
+const RPS_HAM_WIN = [
+    "เย่! ${name} จะชนะเค้า ไปเรียนอนุบาลใหม่ไปป!",
+    "ฮ่าๆ ${name} แพ้แล้ว! ไปเรียนอนุบาลก่อนนะ",
+    "หนูชนะแล้วววว ${name} แพ้สุดๆ",
+    "${name} เป่ายิงฉุบไม่เก่งเลย แพ้แฮมตัวเล็กๆ",
+    "เห็นมั้ย หนูเก่งกว่า ${name} เลย!",
+];
+const RPS_USER_WIN = [
+    "น็อกเอ้าท์แล้ว... จุก...",
+    "อ้าาา หนูแพ้... จุกๆ...",
+    "อึ๋ย ยอมแพ้แล้ว...",
+    "หนูพลาดดด ตาตาาา",
+    "หนูล้มแล้ว... ลุกไม่ขึ้น...",
+];
+const RPS_TIE = [
+    "เอ๊ะ ออกเหมือนกัน เสมอ!",
+    "เสมอแล้ว ลองใหม่มั้ย",
+    "เป่าใหม่ๆ ยังไม่จบ!",
+];
 
 // ───────────────────────────── Defaults ─────────────────────────────
 const DEFAULTS = {
@@ -166,18 +179,16 @@ const DEFAULTS = {
     idleChatter: true,
     posX: 80,
     posY: 80,
-    voiceMode: "off",          // off | tts | elevenlabs | custom
+    voiceMode: "off",
     ttsVoice: "",
     ttsPitchBoost: 0,
     ttsRate: 1.0,
     ttsVolume: 0.85,
-    // ElevenLabs
     elKey: "",
     elVoiceId: "",
     elModelId: "eleven_multilingual_v2",
     elVoices: [],
-    // Custom audio (URLs by category)
-    customAudio: {},           // { click: ["url1", "url2"], drag: [...], hamFallback: [...] }
+    customAudio: {},
 };
 
 // ───────────────────────────── State ─────────────────────────────
@@ -185,6 +196,7 @@ const state = {
     pet: null,
     bubble: null,
     panel: null,
+    rpsModal: null,
     x: 80, y: 80,
     facing: "right",
     mood: "normal",
@@ -202,6 +214,7 @@ const state = {
     ringStart: null,
     ringRAF: null,
     currentAudio: null,
+    rpsActive: false,
 };
 
 const audioCache = new Map();
@@ -228,7 +241,6 @@ function preprocessText(text) {
         .trim();
 }
 
-// ───────────────────────────── Audio unlock ─────────────────────────────
 function unlockAudio() {
     if (state.audioUnlocked) return;
     if (window.speechSynthesis) {
@@ -293,7 +305,6 @@ function speakTTS(text, mood) {
             u.onend = () => resolve();
             u.onerror = () => resolve();
             window.speechSynthesis.speak(u);
-            // Safety: if onend never fires, resolve after generous timeout
             setTimeout(resolve, 30000);
         } catch (_) { resolve(); }
     });
@@ -383,7 +394,7 @@ async function fetchElevenVoices(apiKey) {
     } catch (_) { return []; }
 }
 
-// ───────────────────────────── Custom audio (user-provided MP3 URLs) ─────────────────────────────
+// ───────────────────────────── Custom audio ─────────────────────────────
 async function speakCustomAudio(text, mood, category) {
     const s = settings();
     const map = s.customAudio || {};
@@ -391,11 +402,10 @@ async function speakCustomAudio(text, mood, category) {
     if (category && Array.isArray(map[category])) urls = map[category];
     else if (Array.isArray(map.hamFallback)) urls = map.hamFallback;
     const url = pickOne(urls);
-    if (!url) return; // no audio available for this category — silent
+    if (!url) return;
     return playAudioUrl(url, s.ttsVolume ?? 0.85);
 }
 
-// ───────────────────────────── Vocalize dispatcher ─────────────────────────────
 async function vocalize(text, mood, category) {
     const s = settings();
     if (s.voiceMode === "off") return;
@@ -446,7 +456,7 @@ function buildPet() {
     setMood("normal");
 
     setTimeout(() => {
-        if (state.status === "idle") sayQueued(pickOne(LINES.greeting), "wave", "greeting");
+        if (state.status === "idle") sayQueued(pickOne(LINES.greeting), "happy", "greeting");
     }, 1500);
 }
 
@@ -458,9 +468,11 @@ function destroyPet() {
     state.pet?.remove();
     state.bubble?.remove();
     state.panel?.remove();
+    state.rpsModal?.remove();
     state.pet = null;
     state.bubble = null;
     state.panel = null;
+    state.rpsModal = null;
 }
 
 function applyTransform() {
@@ -516,7 +528,6 @@ function sayQueued(text, mood = "normal", category = null) {
     if (!state.queueRunning) runQueue();
 }
 
-// Reading time: enough for a person to comfortably read the line
 function readingTime(text) {
     const len = (text || "").length;
     return clamp(2500 + len * 90, 3000, 18000);
@@ -531,44 +542,36 @@ async function runQueue() {
             setMood(item.mood);
             showBubble(item.text);
             state.status = "talking";
-
-            // Wait BOTH min reading time AND speech-end (whichever takes longer)
             const minWait = new Promise(r => setTimeout(r, readingTime(item.text)));
             const speech = vocalize(item.text, item.mood, item.category) || Promise.resolve();
             await Promise.all([minWait, speech]);
-
             hideBubble();
             await new Promise(r => setTimeout(r, 250));
         }
     } finally {
         state.queueRunning = false;
         state.status = "idle";
-        setTimeout(() => { if (state.status === "idle") setMood("normal"); }, 400);
+        setTimeout(() => { if (state.status === "idle" && !state.rpsActive) setMood("normal"); }, 400);
     }
 }
 
-// ───────────────────────────── Walking (gentle) ─────────────────────────────
+// ───────────────────────────── Walking ─────────────────────────────
 function moveTo(nx, ny, durMs = null) {
     if (!state.pet) return;
     if (state.walkAnim) cancelAnimationFrame(state.walkAnim);
-
     const s = settings();
     nx = clamp(nx, 4, window.innerWidth - s.size - 4);
     ny = clamp(ny, 4, window.innerHeight - s.size - 4);
-
     const sx = state.x, sy = state.y;
     const dx = nx - sx, dy = ny - sy;
     const dist = Math.hypot(dx, dy);
     if (dist < 2) return;
-
     if (dx > 4) state.facing = "right";
     else if (dx < -4) state.facing = "left";
-
     const speed = 65;
     const dur = durMs ?? clamp((dist / speed) * 1000, 1000, 6000);
     state.status = "walking";
     state.pet.classList.add("hh-walking");
-
     const startTs = performance.now();
     function step(now) {
         const t = clamp((now - startTs) / dur, 0, 1);
@@ -597,12 +600,12 @@ function scheduleWalk() {
     if (!s.enabled) return;
     const wait = (s.walkInterval * 1000) + Math.random() * 5000;
     state.walkTimer = setTimeout(() => {
-        if (state.status === "idle") doRandomWalk();
+        if (state.status === "idle" && !state.rpsActive) doRandomWalk();
         scheduleWalk();
-        if (s.idleChatter && Math.random() < 0.25 && state.status === "idle") {
+        if (s.idleChatter && Math.random() < 0.25 && state.status === "idle" && !state.rpsActive) {
             sayQueued(pickOne(LINES.idle), "normal", "idle");
         }
-        if (s.avoidChat) maybeAvoidChat();
+        if (s.avoidChat && !state.rpsActive) maybeAvoidChat();
     }, wait);
 }
 
@@ -626,7 +629,6 @@ function maybeAvoidChat() {
     const b = last.getBoundingClientRect();
     const overlap = !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
     if (!overlap) return;
-
     sayQueued(pickOne(LINES.blocking), "scheming", "blocking");
     const s = settings();
     const goLeft = a.left > window.innerWidth / 2;
@@ -635,7 +637,7 @@ function maybeAvoidChat() {
     setTimeout(() => moveTo(targetX, targetY), 900);
 }
 
-// ───────────────────────────── Long-press ring ─────────────────────────────
+// ───────────────────────────── Long-press ─────────────────────────────
 function startLongPress() {
     cancelLongPress();
     state.ringStart = performance.now();
@@ -711,6 +713,7 @@ function fireLongPress(x, y) {
 // ───────────────────────────── Drag / click / long-press ─────────────────────────────
 function bindInputs() {
     const onDown = (e) => {
+        if (state.rpsActive) return; // ignore inputs during RPS
         unlockAudio();
         const ev = e.touches ? e.touches[0] : e;
         e.preventDefault();
@@ -777,6 +780,7 @@ function bindInputs() {
     window.addEventListener("touchcancel", onUp);
     state.pet.addEventListener("contextmenu", (e) => {
         e.preventDefault();
+        if (state.rpsActive) return;
         unlockAudio();
         cancelLongPress();
         togglePanel(e.clientX, e.clientY);
@@ -790,19 +794,141 @@ function bindInputs() {
 }
 
 function handleClick() {
+    if (state.rpsActive) return;
     state.clickStreak++;
     if (state.clickResetTimer) clearTimeout(state.clickResetTimer);
     state.clickResetTimer = setTimeout(() => state.clickStreak = 0, 2200);
+
+    // 3 rapid clicks → trigger RPS game!
+    if (state.clickStreak === 3) {
+        triggerRPSGame();
+        return;
+    }
+
     let line, mood, category;
-    if (state.clickStreak >= 6) { line = pickOne(LINES.clickSad); mood = "sad"; category = "clickSad"; }
-    else if (state.clickStreak >= 3) { line = pickOne(LINES.clickAngry); mood = "angry"; category = "clickAngry"; }
+    if (state.clickStreak >= 7) { line = pickOne(LINES.clickSad); mood = "sad"; category = "clickSad"; }
+    else if (state.clickStreak >= 5) { line = pickOne(LINES.clickAngry); mood = "angry"; category = "clickAngry"; }
     else { line = pickOne(LINES.click); mood = "tense"; category = "click"; }
-    // Keep a small queue (don't blow up current line on rapid taps)
+
     if (state.queue.length > 1) state.queue.length = 1;
     sayQueued(line, mood, category);
     state.pet.classList.remove("hh-bounce");
     void state.pet.offsetWidth;
     state.pet.classList.add("hh-bounce");
+}
+
+// ───────────────────────────── Rock-Paper-Scissors mini-game ─────────────────────────────
+function triggerRPSGame() {
+    if (state.rpsActive) return;
+    state.rpsActive = true;
+    state.clickStreak = 0;
+    state.queue.length = 0;
+    state.queueRunning = false;
+    if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch (_) {}
+    if (state.currentAudio) try { state.currentAudio.pause(); } catch (_) {}
+    state.pet.classList.remove("hh-bounce", "hh-knockout", "hh-celebrate");
+
+    sayQueued(pickOne(RPS_CHALLENGE), "scheming", "click");
+    setTimeout(() => showRPSUI(), 1800);
+}
+
+function showRPSUI() {
+    if (!state.rpsActive) return;
+    if (state.rpsModal) { state.rpsModal.remove(); state.rpsModal = null; }
+    const rps = document.createElement("div");
+    rps.id = "hh-rps";
+    rps.innerHTML = `
+        <div class="hh-rps-card">
+            <div class="hh-rps-title">เป่า ยิง ฉุบ!</div>
+            <div class="hh-rps-subtitle">เลือกเลย ใครแพ้ยอม~</div>
+            <div class="hh-rps-buttons">
+                <button data-c="rock"><span class="hh-rps-emoji">✊</span><span class="hh-rps-label">ค้อน</span></button>
+                <button data-c="paper"><span class="hh-rps-emoji">✋</span><span class="hh-rps-label">กระดาษ</span></button>
+                <button data-c="scissors"><span class="hh-rps-emoji">✌️</span><span class="hh-rps-label">กรรไกร</span></button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(rps);
+    state.rpsModal = rps;
+    rps.querySelectorAll("button[data-c]").forEach(b => {
+        b.addEventListener("click", () => {
+            const userPick = b.dataset.c;
+            const hamPick = ["rock", "paper", "scissors"][Math.floor(Math.random() * 3)];
+            revealRPS(rps, hamPick, userPick);
+        });
+    });
+}
+
+function determineRPS(user, ham) {
+    if (user === ham) return "tie";
+    const beats = { rock: "scissors", paper: "rock", scissors: "paper" };
+    return beats[user] === ham ? "user" : "ham";
+}
+
+function revealRPS(container, hamPick, userPick) {
+    const emoji = { rock: "✊", paper: "✋", scissors: "✌️" };
+    const card = container.querySelector(".hh-rps-card");
+    const result = determineRPS(userPick, hamPick);
+    card.innerHTML = `
+        <div class="hh-rps-vs">
+            <div class="hh-rps-side">
+                <div class="hh-rps-side-label">แฮม</div>
+                <div class="hh-rps-side-emoji hh-rps-shake">${emoji[hamPick]}</div>
+            </div>
+            <div class="hh-rps-vs-text">VS</div>
+            <div class="hh-rps-side">
+                <div class="hh-rps-side-label">เธอ</div>
+                <div class="hh-rps-side-emoji hh-rps-shake">${emoji[userPick]}</div>
+            </div>
+        </div>
+        <div class="hh-rps-result hh-rps-result-${result}">
+            ${result === "user" ? "พี่ชนะ!" : result === "ham" ? "หนูชนะ!" : "เสมอ!"}
+        </div>
+    `;
+    setTimeout(() => {
+        container.remove();
+        state.rpsModal = null;
+        finishRPS(result);
+    }, 2200);
+}
+
+function finishRPS(result) {
+    const ctx = getContext?.();
+    const userName = (ctx?.name1 || "พี่").toString().trim() || "พี่";
+    state.queue.length = 0;
+    state.queueRunning = false;
+
+    if (result === "user") {
+        // Ham loses → knockout!
+        state.pet.classList.remove("hh-bounce", "hh-celebrate");
+        state.pet.classList.add("hh-knockout");
+        setMood("sad");
+        sayQueued(pickOne(RPS_USER_WIN), "sad", "click");
+        setTimeout(() => {
+            state.pet?.classList.remove("hh-knockout");
+            state.rpsActive = false;
+            state.clickStreak = 0;
+        }, 5500);
+    } else if (result === "ham") {
+        // Ham wins → celebrate!
+        state.pet.classList.remove("hh-bounce", "hh-knockout");
+        state.pet.classList.add("hh-celebrate");
+        setMood("happy");
+        const line = pickOne(RPS_HAM_WIN).replace(/\$\{name\}/g, userName);
+        sayQueued(line, "happy", "click");
+        setTimeout(() => {
+            state.pet?.classList.remove("hh-celebrate");
+            state.rpsActive = false;
+            state.clickStreak = 0;
+        }, 4500);
+    } else {
+        // Tie
+        sayQueued(pickOne(RPS_TIE), "curious", "click");
+        setTimeout(() => {
+            state.rpsActive = false;
+            state.clickStreak = 0;
+        }, 3000);
+    }
 }
 
 // ───────────────────────────── Ham tag interception ─────────────────────────────
@@ -824,7 +950,9 @@ function processMessage(messageId) {
         }
     }
     for (const m of matches) {
-        const mood = (m[1] || "normal").toLowerCase();
+        // Map removed "wave" mood to "happy" so old cards keep working
+        let mood = (m[1] || "normal").toLowerCase();
+        if (mood === "wave") mood = "happy";
         const text = (m[2] || "").trim().replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
         if (text) sayQueued(text, mood, "hamFallback");
     }
@@ -855,6 +983,7 @@ function togglePanel(x, y) {
     const p = document.createElement("div");
     p.id = "hh-panel";
     p.innerHTML = `
+        <button class="hh-x-close" aria-label="ปิด">✕</button>
         <div class="hh-panel-title">🌸 แฮมๆ Buddy</div>
 
         <div class="hh-section">⚙️ ทั่วไป</div>
@@ -870,25 +999,21 @@ function togglePanel(x, y) {
         <label class="hh-row hh-col"><span>โหมดเสียง</span>
             <select data-k="voiceMode">
                 <option value="off" ${s.voiceMode==="off"?"selected":""}>🔇 ปิดเสียง (แนะนำ)</option>
-                <option value="elevenlabs" ${s.voiceMode==="elevenlabs"?"selected":""}>✨ ElevenLabs (เสียงธรรมชาติ / clone)</option>
+                <option value="elevenlabs" ${s.voiceMode==="elevenlabs"?"selected":""}>✨ ElevenLabs</option>
                 <option value="custom" ${s.voiceMode==="custom"?"selected":""}>📼 อัดเสียงเอง (MP3 URL)</option>
-                <option value="tts" ${s.voiceMode==="tts"?"selected":""}>📢 Browser TTS (หุ่นยนต์ ฟรี)</option>
+                <option value="tts" ${s.voiceMode==="tts"?"selected":""}>📢 Browser TTS (หุ่นยนต์)</option>
             </select>
         </label>
-        <div class="hh-info" style="display:${s.voiceMode==="off"?"block":"none"}" data-show="off">
-            ✨ ปิดเสียงเป็น default เพราะเบราเซอร์ไม่มีเสียงน่ารักจริงๆ ให้ใช้<br>
-            ถ้าอยากได้เสียงธรรมชาติ → ใช้ ElevenLabs (เสียง clone)<br>
-            ถ้าอยากใช้เสียงตัวเอง → อัด MP3 แล้วใส่ URL
+        <div class="hh-info" data-show="off" style="display:${s.voiceMode==="off"?"block":"none"}">
+            ✨ Default ปิดเสียง เพราะเบราเซอร์ไม่มีเสียงน่ารักจริงๆ
         </div>
 
         <div class="hh-eleven-block" style="display:${s.voiceMode==="elevenlabs"?"block":"none"}">
             <div class="hh-info">
-                📌 <b>วิธี:</b> สมัครฟรีที่ <a href="https://elevenlabs.io" target="_blank">elevenlabs.io</a><br>
-                1. Profile → API Keys → Create → Copy<br>
-                2. Voice Library → Voice Lab → Add Voice → <b>Instant Voice Clone</b><br>
-                3. อัดเสียงตัวเอง 1-5 นาที (อ่านอะไรก็ได้ ในที่เงียบ)<br>
-                4. กดปุ่ม "ดึง voices" ข้างล่าง → เลือกเสียงตัวเอง<br>
-                💰 ฟรี 10 นาที/เดือน, $5/เดือน หลังจากนั้น
+                📌 สมัครฟรีที่ <a href="https://elevenlabs.io" target="_blank">elevenlabs.io</a><br>
+                Profile → API Keys → Create<br>
+                Voice Lab → Instant Voice Clone (อัด 1-5 นาที)<br>
+                💰 ฟรี 10 นาที/เดือน
             </div>
             <label class="hh-row hh-col"><span>API Key</span>
                 <input type="password" data-k="elKey" value="${s.elKey || ""}" placeholder="sk_...">
@@ -902,9 +1027,9 @@ function togglePanel(x, y) {
             </label>
             <label class="hh-row hh-col"><span>โมเดล</span>
                 <select data-k="elModelId">
-                    <option value="eleven_multilingual_v2" ${s.elModelId==="eleven_multilingual_v2"?"selected":""}>Multilingual v2 (คุณภาพสูง)</option>
-                    <option value="eleven_turbo_v2_5" ${s.elModelId==="eleven_turbo_v2_5"?"selected":""}>Turbo v2.5 (เร็ว ประหยัด credit)</option>
-                    <option value="eleven_flash_v2_5" ${s.elModelId==="eleven_flash_v2_5"?"selected":""}>Flash v2.5 (เร็วสุด)</option>
+                    <option value="eleven_multilingual_v2" ${s.elModelId==="eleven_multilingual_v2"?"selected":""}>Multilingual v2</option>
+                    <option value="eleven_turbo_v2_5" ${s.elModelId==="eleven_turbo_v2_5"?"selected":""}>Turbo v2.5</option>
+                    <option value="eleven_flash_v2_5" ${s.elModelId==="eleven_flash_v2_5"?"selected":""}>Flash v2.5</option>
                 </select>
             </label>
             <label class="hh-row"><span>ความดัง <span class="hh-val">${Math.round(s.ttsVolume*100)}%</span></span><input type="range" min="0" max="100" step="5" data-k="ttsVolume" value="${s.ttsVolume*100}"></label>
@@ -913,27 +1038,18 @@ function togglePanel(x, y) {
 
         <div class="hh-custom-block" style="display:${s.voiceMode==="custom"?"block":"none"}">
             <div class="hh-info">
-                📼 <b>วิธี:</b> อัดเสียงพูดประโยคของแฮมๆ ด้วยเสียงตัวเอง บันทึกเป็น MP3<br>
-                อัปโหลดไปที่ github (เป็น raw URL) หรือ Google Drive (link share)<br>
-                แล้วใส่ JSON ตามรูปแบบนี้:<br><br>
-                หมวดที่ใช้ได้: <code>click, clickAngry, clickSad, drag, blocking, idle, greeting, hamFallback</code><br>
-                แต่ละหมวดเป็น array URL — ระบบจะสุ่มเล่น
+                📼 อัดเสียงตัวเอง upload เป็น MP3 → ใส่ JSON ตามรูปแบบ<br>
+                หมวด: <code>click, clickAngry, clickSad, drag, blocking, idle, greeting, hamFallback</code>
             </div>
             <label class="hh-row hh-col"><span>JSON Audio Map</span>
-                <textarea data-k="customAudio" rows="8" placeholder='{
-  "click": ["https://.../click1.mp3", "https://.../click2.mp3"],
-  "drag": ["https://.../drag1.mp3"]
-}'>${customAudioJson === "{}" ? "" : customAudioJson}</textarea>
+                <textarea data-k="customAudio" rows="8" placeholder='{"click":["https://.../click1.mp3"]}'>${customAudioJson === "{}" ? "" : customAudioJson}</textarea>
             </label>
             <label class="hh-row"><span>ความดัง <span class="hh-val">${Math.round(s.ttsVolume*100)}%</span></span><input type="range" min="0" max="100" step="5" data-k="ttsVolume" value="${s.ttsVolume*100}"></label>
-            <button class="hh-test-btn">▶️ ทดสอบ (สุ่มจาก click)</button>
+            <button class="hh-test-btn">▶️ ทดสอบ</button>
         </div>
 
         <div class="hh-tts-block" style="display:${s.voiceMode==="tts"?"block":"none"}">
-            <div class="hh-info">
-                ⚠️ Browser TTS ใช้เสียงระบบ OS ฟังเป็นหุ่นยนต์ทุกตัว ไม่ค่อยน่ารัก<br>
-                แนะนำให้ใช้ ElevenLabs หรือ Custom Audio แทน
-            </div>
+            <div class="hh-info">⚠️ TTS ฟังเป็นหุ่นยนต์ แนะนำใช้ ElevenLabs แทน</div>
             <label class="hh-row hh-col"><span>เสียง</span>
                 <select data-k="ttsVoice">${voiceOptions}</select>
             </label>
@@ -947,6 +1063,9 @@ function togglePanel(x, y) {
         <div class="hh-moods">
             ${Object.keys(SPRITES).map(m => `<button data-mood="${m}">${m}</button>`).join("")}
         </div>
+
+        <div class="hh-section">🎮 มินิเกม</div>
+        <button class="hh-rps-test">เป่ายิงฉุบ! (ทดสอบ)</button>
 
         <button class="hh-close">ปิดเมนู</button>
     `;
@@ -964,6 +1083,10 @@ function togglePanel(x, y) {
         const offInfo = p.querySelector('[data-show="off"]');
         if (offInfo) offInfo.style.display = mode === "off" ? "block" : "none";
     }
+
+    const closePanel = () => { p.remove(); state.panel = null; };
+    p.querySelector(".hh-x-close").addEventListener("click", closePanel);
+    p.querySelector(".hh-close").addEventListener("click", closePanel);
 
     p.querySelectorAll("input, select, textarea").forEach(inp => {
         inp.addEventListener("change", () => {
@@ -1000,7 +1123,7 @@ function togglePanel(x, y) {
                         inp.style.borderColor = "#d7789b";
                     } catch (_) {
                         inp.style.borderColor = "#da5864";
-                        return; // don't save invalid
+                        return;
                     }
                 }
             } else if (inp.type === "password" || inp.type === "text") {
@@ -1026,7 +1149,7 @@ function togglePanel(x, y) {
         const list = await fetchElevenVoices(apiKey);
         e.target.textContent = "🔄 ดึงรายการ voices";
         e.target.disabled = false;
-        if (!list.length) { alert("โหลดไม่สำเร็จ — ตรวจ API Key อีกที"); return; }
+        if (!list.length) { alert("โหลดไม่สำเร็จ ตรวจ API Key อีกที"); return; }
         cur.elVoices = list;
         cur.elKey = apiKey;
         save();
@@ -1052,7 +1175,12 @@ function togglePanel(x, y) {
             sayQueued(`mood: ${b.dataset.mood}`, b.dataset.mood, null);
         });
     });
-    p.querySelector(".hh-close").addEventListener("click", () => { p.remove(); state.panel = null; });
+    p.querySelector(".hh-rps-test")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        unlockAudio();
+        closePanel();
+        setTimeout(() => triggerRPSGame(), 300);
+    });
 
     setTimeout(() => {
         document.addEventListener("mousedown", function dismiss(e) {
@@ -1092,4 +1220,4 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
 } else {
     setTimeout(boot, 400);
-}
+    }
