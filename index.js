@@ -1220,4 +1220,4 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
 } else {
     setTimeout(boot, 400);
-    }
+}
