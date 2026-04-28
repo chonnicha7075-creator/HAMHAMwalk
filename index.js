@@ -1,8 +1,9 @@
-// 🌸 HamHam Buddy v3
-// - Default voice = best-tuned TTS (cute pitch + mood-based rate)
-// - Voice picker so user can find their favorite voice on their device
-// - 5-second long-press to open settings (with visual progress ring)
-// - Right-click on PC still opens settings instantly
+// 🌸 HamHam Buddy v5
+// - Voice OFF by default (no more annoying robot/beep sounds)
+// - Real voice options: ElevenLabs (cloning) or Custom audio URLs (your own MP3s)
+// - Bubble waits for speech to finish — no more cut-off sentences
+// - Gentle walk animation (no more tilting/hopping)
+// - Cleaned Thai (typo fixes)
 
 import { eventSource, event_types, saveSettingsDebounced } from "../../../../script.js";
 import { extension_settings, getContext } from "../../../extensions.js";
@@ -35,7 +36,6 @@ const MOOD_COLORS = {
     nsfw:     { border: "#d7789b", bg: "#fff0f5" },
 };
 
-// pitch + rate per mood (TTS)
 const MOOD_TTS = {
     happy:    { pitch: 2.0, rate: 1.05 },
     wave:     { pitch: 1.95, rate: 1.0 },
@@ -48,103 +48,112 @@ const MOOD_TTS = {
     sad:      { pitch: 1.35, rate: 0.85 },
 };
 
-// chitter pitch by mood
-const MOOD_PITCH = {
-    happy: 1.45, wave: 1.35, curious: 1.20, normal: 1.00,
-    nsfw: 1.05, scheming: 0.95, tense: 0.90, angry: 0.80, sad: 0.70,
+const MOOD_ELEVEN = {
+    happy:    { stability: 0.30, similarity_boost: 0.75, style: 0.65 },
+    wave:     { stability: 0.35, similarity_boost: 0.75, style: 0.55 },
+    curious:  { stability: 0.40, similarity_boost: 0.75, style: 0.45 },
+    normal:   { stability: 0.50, similarity_boost: 0.75, style: 0.30 },
+    nsfw:     { stability: 0.45, similarity_boost: 0.80, style: 0.40 },
+    scheming: { stability: 0.40, similarity_boost: 0.75, style: 0.50 },
+    tense:    { stability: 0.30, similarity_boost: 0.75, style: 0.60 },
+    angry:    { stability: 0.25, similarity_boost: 0.70, style: 0.75 },
+    sad:      { stability: 0.45, similarity_boost: 0.80, style: 0.40 },
 };
 
-// ───────────────────────────── Lines ─────────────────────────────
+// ───────────────────────────── Lines (cleaned, no typos) ─────────────────────────────
 const LINES = {
     click: [
-        "โอ้ย ทำหนูทำไมเนี่ย!",
-        "อย่าจิ้มสิคะ เจ็บนะ!",
-        "ฮึ่งงง! แกล้งหนูตลอดเลย",
-        "พอแล้วๆ! ตัวเล็กๆ จะแตกแล้วน้า",
-        "หยุดนะ! ไม่หยุดร้องนะ",
-        "อ๊ายยย จิ้มอะไรของเธอ!",
+        "โอ้ย ทำหนูทำไมเนี่ย",
+        "อย่าจิ้มสิคะ เจ็บนะ",
+        "ฮึ่ง แกล้งหนูตลอดเลย",
+        "พอแล้ว ตัวเล็กๆ จะแตกแล้วน้า",
+        "หยุดนะ ไม่หยุดร้องนะ",
+        "อ๊ายย จิ้มอะไรของเธอ",
         "นิ้วใหญ่จัง น่ากลัวอ่ะ",
-        "อย่าน้าาา หนูตัวบาง!",
+        "อย่าน้าาา หนูตัวบาง",
         "หนูบอกแล้วไงว่าอย่าจิ้ม",
-        "เธอนี่นะ ขี้แกล้งง",
-        "ก๊าก! ตกใจหมดเลย",
+        "เธอนี่นะ ขี้แกล้งจังเลย",
+        "ก๊าก ตกใจหมดเลย",
         "พี่นี่นะ ใจร้ายจังเลย ฮึ่ง",
-        "เอ๊ะ ทำไมต้องจิ้มหนูด้วย!",
+        "ทำไมต้องจิ้มหนูด้วยอ่ะ",
     ],
     clickAngry: [
-        "พอได้แล้ว!",
-        "หนูจะกัดจริงๆ แล้วน้า!",
-        "ไม่เล่นด้วยแล้ว! ฮึ่ง!",
-        "แกล้งหนูพอแล้วน้า โกรธจริงน่ะ!",
-        "พี่!! หนูจะร้องบอกแม่มุนะ!",
-        "ใจร้ายมากเลยรู้มั้ย!",
-        "ไม่ปั่นด้วยแล้ว ไปแล้ว ฮึ่ง!",
-        "บอกแล้วไงว่าหยุด! ไม่ฟังเลย!",
+        "พอได้แล้ว",
+        "หนูจะกัดจริงๆ แล้วน้า",
+        "ไม่เล่นด้วยแล้ว ฮึ่ง",
+        "แกล้งหนูพอแล้ว โกรธจริงนะ",
+        "พี่ หนูจะร้องบอกแม่มุนะ",
+        "ใจร้ายมากเลยรู้มั้ย",
+        "ไม่ปั่นด้วยแล้ว ไปแล้ว ฮึ่ง",
+        "บอกแล้วไงว่าหยุด ไม่ฟังเลย",
     ],
     clickSad: [
-        "หนูร้องไห้แล้วน้า...",
-        "ทำไมแกล้งหนูตลอดเลยอ่ะ...",
-        "หนูไปอยู่คนเดียวดีกว่า ฮึ่ก",
-        "พี่ไม่รักหนูแล้วเหรอ...",
-        "หนูเจ็บจริงๆ น้า ฮือออ",
-        "ไม่อยากเล่นกับพี่อีกแล้ว...",
-        "หนูทำอะไรผิดเหรอ ทำไมแกล้งกัน...",
+        "หนูร้องไห้แล้วน้า",
+        "ทำไมแกล้งหนูตลอดเลยอ่ะ",
+        "หนูไปอยู่คนเดียวดีกว่า",
+        "พี่ไม่รักหนูแล้วเหรอ",
+        "หนูเจ็บจริงๆ น้า",
+        "ไม่อยากเล่นกับพี่อีกแล้ว",
+        "หนูทำอะไรผิดเหรอ ทำไมแกล้งกัน",
     ],
     drag: [
-        "พี่จะมาลากหนูไปไหน ฟ้องแม่มุแน่!",
-        "วางหนูลงนะะะ ตกใจหมดแล้ว",
-        "อ๊ายยย หล่นน หล่นน",
-        "หนูไม่ใช่ของเล่นน้า!",
-        "อุ๊ย ขนยุ่งเลย!",
-        "บินได้เหรอเนี่ย น่ากลัวจังง",
-        "ปล่อยหนูสิ! ปล่อยน้า!",
-        "พี่หิ้วหนูแบบไม่บอกก่อน รุนแรง!",
-        "หมุนๆ เวียนหัวแล้วววว",
-        "พี่จะพาหนูไปไหนเหรอ บ๊วยมั้ย",
-        "ระวังด้วยนะ หนูเปราะบาง!",
-        "หนูร้องน้อยา ใครก็ได้ช่วยที!",
-        "อ๊ายย ทำไมต้องลากด้วยอ่ะ",
+        "พี่จะมาลากหนูไปไหน ฟ้องแม่มุแน่",
+        "วางหนูลงนะ ตกใจหมดแล้ว",
+        "อ๊ายย หล่นแล้วๆ",
+        "หนูไม่ใช่ของเล่นน้า",
+        "อุ๊ย ขนยุ่งเลย",
+        "บินได้เหรอเนี่ย น่ากลัวจัง",
+        "ปล่อยหนูสิ ปล่อยน้า",
+        "พี่หิ้วหนูแบบไม่บอกก่อน รุนแรงเลย",
+        "หมุนๆ เวียนหัวแล้ว",
+        "พี่จะพาหนูไปไหนเหรอ ไปกินบ๊วยมั้ย",
+        "ระวังด้วยนะ หนูเปราะบาง",
+        "ใครก็ได้ช่วยหนูที",
+        "ทำไมต้องลากด้วยอ่ะ",
     ],
     blocking: [
-        "บังข้อความดีกว่าอิอิ ไม่เห็นแล้วว",
+        "บังข้อความดีกว่า อิอิ ไม่เห็นแล้ว",
         "เห็นมั้ยคะ ไม่เห็นใช่ปะ ฮิๆ",
         "เธอไม่ต้องอ่าน หนูบังให้",
         "ตรงนี้ของหนูแล้วน้า",
-        "อยากอ่านเหรอ ไล่หนูสิ ม่ายไป๊",
-        "นั่งทับดีก่า ฮิๆ",
+        "อยากอ่านเหรอ ไล่หนูสิ ไม่ไป",
+        "นั่งทับดีกว่า ฮิๆ",
         "ความลับของพี่ หนูเก็บให้",
         "อย่าอ่านน้า อยู่กับหนูดีกว่า",
-        "ทำตัวเป็นป้าย censor ฮิๆ",
-        "หนูเป็น sticker บังข้อความน้า",
+        "ทำตัวเป็นป้ายเซ็นเซอร์ ฮิๆ",
+        "หนูเป็นสติกเกอร์บังข้อความน้า",
         "ตรงนี้ของหนูจองแล้ว",
     ],
     idle: [
-        "หิวจัง...",
+        "หิวจังเลย",
         "เย้ๆ ว่างเลย",
-        "ง่วงน้อนนน",
+        "ง่วงนอนนน",
         "บ๊วยอยู่ไหนนะ",
         "วันนี้อากาศดีจัง",
-        "เด๋วต้องไปกินขนม",
-        "แม่มุๆ คิดถึงงง",
+        "เดี๋ยวต้องไปกินขนม",
+        "แม่มุๆ คิดถึงจัง",
         "เบื่อจัง ทำไรดีน้า",
         "อยากกินเมล็ดทานตะวัน",
         "ขนหนูฟูๆ น่ารักมั้ยคะ",
         "หาวๆ ง่วงๆ",
         "ฮัมเพลงนิดนึงน้า ลา ลา ลา",
-        "ใครเรียกหนูเหรอ?",
+        "ใครเรียกหนูเหรอ",
         "วันนี้พี่ดูเท่ดีน้า ฮิๆ",
         "หนูแก้มยุ้ย เพราะเก็บอาหารไว้",
     ],
     greeting: [
-        "ฮัลโหลล! แฮมๆ มาแล้วว",
+        "ฮัลโหลล แฮม แฮม มาแล้ว",
         "พี่กลับมาแล้วเหรอ คิดถึงงง",
         "ว่าไง ว่าไง วันนี้เล่นอะไรกันดี",
-        "เย้! ได้เจอพี่แล้ว",
+        "เย้ ได้เจอพี่แล้ว",
         "ตื่นแล้วน้าาา",
-        "วันนี้พร้อมแล้วค่า!",
+        "วันนี้พร้อมแล้วค่า",
         "ฮายยย พี่ คิดถึงสุดๆ เลย",
     ],
 };
+
+// Map from category → key in LINES
+const LINE_CATEGORIES = ["click", "clickAngry", "clickSad", "drag", "blocking", "idle", "greeting"];
 
 // ───────────────────────────── Defaults ─────────────────────────────
 const DEFAULTS = {
@@ -157,12 +166,18 @@ const DEFAULTS = {
     idleChatter: true,
     posX: 80,
     posY: 80,
-    voiceMode: "tts",       // tts | chitter | off
-    ttsVoice: "",            // empty = auto
-    ttsPitchBoost: 0,        // -0.5 ... +0.25 user adjustment on top of mood pitch
-    ttsRate: 1.0,            // user multiplier
+    voiceMode: "off",          // off | tts | elevenlabs | custom
+    ttsVoice: "",
+    ttsPitchBoost: 0,
+    ttsRate: 1.0,
     ttsVolume: 0.85,
-    chitterVolume: 0.18,
+    // ElevenLabs
+    elKey: "",
+    elVoiceId: "",
+    elModelId: "eleven_multilingual_v2",
+    elVoices: [],
+    // Custom audio (URLs by category)
+    customAudio: {},           // { click: ["url1", "url2"], drag: [...], hamFallback: [...] }
 };
 
 // ───────────────────────────── State ─────────────────────────────
@@ -182,15 +197,17 @@ const state = {
     drag: { active: false, moved: false, longPressed: false, ox: 0, oy: 0, downAt: 0, sx: 0, sy: 0 },
     clickStreak: 0,
     clickResetTimer: null,
-    audioCtx: null,
     audioUnlocked: false,
     ring: null,
     ringStart: null,
     ringRAF: null,
+    currentAudio: null,
 };
 
+const audioCache = new Map();
+
 // ───────────────────────────── Utils ─────────────────────────────
-const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const pickOne = (arr) => arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
 const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
 
 function settings() {
@@ -202,19 +219,18 @@ function settings() {
 }
 function save() { saveSettingsDebounced(); }
 
-// ───────────────────────────── Audio ─────────────────────────────
-function getAudio() {
-    if (!state.audioCtx) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return null;
-        state.audioCtx = new Ctx();
-    }
-    return state.audioCtx;
+function preprocessText(text) {
+    return (text || "")
+        .replace(/แฮมๆ/g, "แฮม แฮม")
+        .replace(/ฮิๆ/g, "ฮิ ฮิ")
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+        .replace(/\s+/g, " ")
+        .trim();
 }
+
+// ───────────────────────────── Audio unlock ─────────────────────────────
 function unlockAudio() {
     if (state.audioUnlocked) return;
-    const ctx = getAudio();
-    if (ctx?.state === "suspended") ctx.resume();
     if (window.speechSynthesis) {
         try {
             const u = new SpeechSynthesisUtterance("");
@@ -224,41 +240,7 @@ function unlockAudio() {
     state.audioUnlocked = true;
 }
 
-function chitter(text, mood = "normal") {
-    const ctx = getAudio();
-    if (!ctx) return;
-    if (ctx.state === "suspended") {
-        ctx.resume();
-        if (ctx.state === "suspended") return;
-    }
-    const s = settings();
-    const syllables = clamp(Math.floor((text || "").length / 2.2), 2, 14);
-    const moodPitch = MOOD_PITCH[mood] || 1.0;
-    const vol = s.chitterVolume;
-    const now = ctx.currentTime;
-    const interval = 0.11;
-
-    for (let i = 0; i < syllables; i++) {
-        const t = now + i * interval;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const filter = ctx.createBiquadFilter();
-        osc.type = "triangle";
-        const basePitch = (700 + Math.random() * 400) * moodPitch;
-        osc.frequency.setValueAtTime(basePitch * 0.85, t);
-        osc.frequency.linearRampToValueAtTime(basePitch * 1.08, t + 0.025);
-        osc.frequency.exponentialRampToValueAtTime(basePitch * 0.7, t + 0.09);
-        filter.type = "lowpass";
-        filter.frequency.value = 3200;
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(vol, t + 0.012);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
-        osc.connect(filter).connect(gain).connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.12);
-    }
-}
-
+// ───────────────────────────── Browser TTS ─────────────────────────────
 let voicesCache = [];
 function loadVoices() {
     if (!window.speechSynthesis) return [];
@@ -290,31 +272,136 @@ function pickBestVoice() {
         if (/female|woman|girl/i.test(n)) pts += 10;
         return pts;
     };
-    const sorted = [...voices].sort((a, b) => score(b) - score(a));
-    return sorted[0] || null;
+    return [...voices].sort((a, b) => score(b) - score(a))[0] || null;
 }
 
-function speakTTS(text, mood = "normal") {
-    if (!window.speechSynthesis) return;
+function speakTTS(text, mood) {
+    return new Promise(resolve => {
+        if (!window.speechSynthesis) return resolve();
+        try {
+            window.speechSynthesis.cancel();
+            const cleaned = preprocessText(text);
+            if (!cleaned) return resolve();
+            const u = new SpeechSynthesisUtterance(cleaned);
+            const v = pickBestVoice();
+            if (v) { u.voice = v; u.lang = v.lang; }
+            const s = settings();
+            const m = MOOD_TTS[mood] || MOOD_TTS.normal;
+            u.pitch = clamp(m.pitch + (s.ttsPitchBoost || 0), 0.1, 2.0);
+            u.rate = clamp(m.rate * (s.ttsRate || 1.0), 0.5, 2.0);
+            u.volume = s.ttsVolume ?? 0.85;
+            u.onend = () => resolve();
+            u.onerror = () => resolve();
+            window.speechSynthesis.speak(u);
+            // Safety: if onend never fires, resolve after generous timeout
+            setTimeout(resolve, 30000);
+        } catch (_) { resolve(); }
+    });
+}
+
+// ───────────────────────────── ElevenLabs ─────────────────────────────
+function trimAudioCache(maxSize = 100) {
+    while (audioCache.size > maxSize) {
+        const firstKey = audioCache.keys().next().value;
+        const url = audioCache.get(firstKey);
+        try { URL.revokeObjectURL(url); } catch (_) {}
+        audioCache.delete(firstKey);
+    }
+}
+
+function playAudioUrl(url, volume = 0.85) {
+    return new Promise(resolve => {
+        if (state.currentAudio) {
+            try { state.currentAudio.pause(); } catch (_) {}
+        }
+        const audio = new Audio(url);
+        audio.volume = volume;
+        state.currentAudio = audio;
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        audio.play().catch(() => resolve());
+        setTimeout(resolve, 30000);
+    });
+}
+
+async function speakElevenLabs(text, mood) {
+    const s = settings();
+    if (!s.elKey || !s.elVoiceId) return speakTTS(text, mood);
+    const cleaned = preprocessText(text);
+    if (!cleaned) return;
+    const cacheKey = `${s.elVoiceId}::${s.elModelId}::${mood}::${cleaned}`;
+    if (audioCache.has(cacheKey)) {
+        return playAudioUrl(audioCache.get(cacheKey), s.ttsVolume ?? 0.85);
+    }
     try {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        const v = pickBestVoice();
-        if (v) { u.voice = v; u.lang = v.lang; }
-        const s = settings();
-        const m = MOOD_TTS[mood] || MOOD_TTS.normal;
-        u.pitch = clamp(m.pitch + (s.ttsPitchBoost || 0), 0.1, 2.0);
-        u.rate = clamp(m.rate * (s.ttsRate || 1.0), 0.5, 2.0);
-        u.volume = s.ttsVolume ?? 0.85;
-        window.speechSynthesis.speak(u);
-    } catch (_) {}
+        const settingsBody = MOOD_ELEVEN[mood] || MOOD_ELEVEN.normal;
+        const r = await fetch(
+            `https://api.elevenlabs.io/v1/text-to-speech/${s.elVoiceId}?output_format=mp3_44100_128`,
+            {
+                method: "POST",
+                headers: {
+                    "xi-api-key": s.elKey,
+                    "Content-Type": "application/json",
+                    "Accept": "audio/mpeg",
+                },
+                body: JSON.stringify({
+                    text: cleaned,
+                    model_id: s.elModelId || "eleven_multilingual_v2",
+                    voice_settings: {
+                        stability: settingsBody.stability,
+                        similarity_boost: settingsBody.similarity_boost,
+                        style: settingsBody.style,
+                        use_speaker_boost: true,
+                    },
+                }),
+            }
+        );
+        if (!r.ok) {
+            console.warn(`[HamHam] ElevenLabs ${r.status}`);
+            return speakTTS(text, mood);
+        }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        audioCache.set(cacheKey, url);
+        trimAudioCache();
+        return playAudioUrl(url, s.ttsVolume ?? 0.85);
+    } catch (err) {
+        console.warn("[HamHam] ElevenLabs error", err);
+        return speakTTS(text, mood);
+    }
 }
 
-function vocalize(text, mood) {
+async function fetchElevenVoices(apiKey) {
+    if (!apiKey) return [];
+    try {
+        const r = await fetch("https://api.elevenlabs.io/v1/voices", {
+            headers: { "xi-api-key": apiKey },
+        });
+        if (!r.ok) return [];
+        const data = await r.json();
+        return (data.voices || []).map(v => ({ voice_id: v.voice_id, name: v.name, category: v.category }));
+    } catch (_) { return []; }
+}
+
+// ───────────────────────────── Custom audio (user-provided MP3 URLs) ─────────────────────────────
+async function speakCustomAudio(text, mood, category) {
+    const s = settings();
+    const map = s.customAudio || {};
+    let urls = null;
+    if (category && Array.isArray(map[category])) urls = map[category];
+    else if (Array.isArray(map.hamFallback)) urls = map.hamFallback;
+    const url = pickOne(urls);
+    if (!url) return; // no audio available for this category — silent
+    return playAudioUrl(url, s.ttsVolume ?? 0.85);
+}
+
+// ───────────────────────────── Vocalize dispatcher ─────────────────────────────
+async function vocalize(text, mood, category) {
     const s = settings();
     if (s.voiceMode === "off") return;
-    if (s.voiceMode === "chitter") return chitter(text, mood);
-    return speakTTS(text, mood);
+    if (s.voiceMode === "elevenlabs") return speakElevenLabs(text, mood);
+    if (s.voiceMode === "custom") return speakCustomAudio(text, mood, category);
+    if (s.voiceMode === "tts") return speakTTS(text, mood);
 }
 
 // ───────────────────────────── DOM ─────────────────────────────
@@ -359,7 +446,7 @@ function buildPet() {
     setMood("normal");
 
     setTimeout(() => {
-        if (state.status === "idle") sayQueued(pickOne(LINES.greeting), "wave", 3000);
+        if (state.status === "idle") sayQueued(pickOne(LINES.greeting), "wave", "greeting");
     }, 1500);
 }
 
@@ -397,7 +484,6 @@ function positionBubble() {
     }
 }
 
-// ───────────────────────────── Mood + bubble ─────────────────────────────
 function setMood(mood) {
     if (!SPRITES[mood]) mood = "normal";
     state.mood = mood;
@@ -410,39 +496,58 @@ function setMood(mood) {
     state.bubble.style.setProperty("--hh-bg", c.bg);
 }
 
-function showBubble(text, ms = 4000) {
+function showBubble(text) {
     if (!state.bubble) return;
+    if (state.bubbleTimer) { clearTimeout(state.bubbleTimer); state.bubbleTimer = null; }
     state.bubble.textContent = text;
     state.bubble.classList.add("hh-visible");
     positionBubble();
-    if (state.bubbleTimer) clearTimeout(state.bubbleTimer);
-    state.bubbleTimer = setTimeout(() => {
-        state.bubble.classList.remove("hh-visible");
-    }, ms);
 }
 
-function sayQueued(text, mood = "normal", ms = null) {
-    state.queue.push({ text, mood, ms });
+function hideBubble() {
+    if (!state.bubble) return;
+    if (state.bubbleTimer) { clearTimeout(state.bubbleTimer); state.bubbleTimer = null; }
+    state.bubble.classList.remove("hh-visible");
+}
+
+function sayQueued(text, mood = "normal", category = null) {
+    if (!text) return;
+    state.queue.push({ text, mood, category });
     if (!state.queueRunning) runQueue();
 }
 
-async function runQueue() {
-    state.queueRunning = true;
-    while (state.queue.length) {
-        const item = state.queue.shift();
-        const dur = item.ms ?? clamp(2200 + (item.text?.length ?? 10) * 70, 2400, 8000);
-        setMood(item.mood);
-        showBubble(item.text, dur);
-        vocalize(item.text, item.mood);
-        state.status = "talking";
-        await new Promise((r) => setTimeout(r, dur + 200));
-    }
-    state.queueRunning = false;
-    state.status = "idle";
-    setTimeout(() => { if (state.status === "idle") setMood("normal"); }, 400);
+// Reading time: enough for a person to comfortably read the line
+function readingTime(text) {
+    const len = (text || "").length;
+    return clamp(2500 + len * 90, 3000, 18000);
 }
 
-// ───────────────────────────── Walking ─────────────────────────────
+async function runQueue() {
+    if (state.queueRunning) return;
+    state.queueRunning = true;
+    try {
+        while (state.queue.length) {
+            const item = state.queue.shift();
+            setMood(item.mood);
+            showBubble(item.text);
+            state.status = "talking";
+
+            // Wait BOTH min reading time AND speech-end (whichever takes longer)
+            const minWait = new Promise(r => setTimeout(r, readingTime(item.text)));
+            const speech = vocalize(item.text, item.mood, item.category) || Promise.resolve();
+            await Promise.all([minWait, speech]);
+
+            hideBubble();
+            await new Promise(r => setTimeout(r, 250));
+        }
+    } finally {
+        state.queueRunning = false;
+        state.status = "idle";
+        setTimeout(() => { if (state.status === "idle") setMood("normal"); }, 400);
+    }
+}
+
+// ───────────────────────────── Walking (gentle) ─────────────────────────────
 function moveTo(nx, ny, durMs = null) {
     if (!state.pet) return;
     if (state.walkAnim) cancelAnimationFrame(state.walkAnim);
@@ -459,8 +564,8 @@ function moveTo(nx, ny, durMs = null) {
     if (dx > 4) state.facing = "right";
     else if (dx < -4) state.facing = "left";
 
-    const speed = 75;
-    const dur = durMs ?? clamp((dist / speed) * 1000, 800, 6000);
+    const speed = 65;
+    const dur = durMs ?? clamp((dist / speed) * 1000, 1000, 6000);
     state.status = "walking";
     state.pet.classList.add("hh-walking");
 
@@ -495,7 +600,7 @@ function scheduleWalk() {
         if (state.status === "idle") doRandomWalk();
         scheduleWalk();
         if (s.idleChatter && Math.random() < 0.25 && state.status === "idle") {
-            sayQueued(pickOne(LINES.idle), "normal", 2500);
+            sayQueued(pickOne(LINES.idle), "normal", "idle");
         }
         if (s.avoidChat) maybeAvoidChat();
     }, wait);
@@ -522,7 +627,7 @@ function maybeAvoidChat() {
     const overlap = !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
     if (!overlap) return;
 
-    sayQueued(pickOne(LINES.blocking), "scheming", 3000);
+    sayQueued(pickOne(LINES.blocking), "scheming", "blocking");
     const s = settings();
     const goLeft = a.left > window.innerWidth / 2;
     const targetX = goLeft ? 30 : window.innerWidth - s.size - 30;
@@ -534,13 +639,10 @@ function maybeAvoidChat() {
 function startLongPress() {
     cancelLongPress();
     state.ringStart = performance.now();
-
     const s = settings();
-    const size = s.size;
-    const ringSize = size + 24;
+    const ringSize = s.size + 24;
     const radius = (ringSize / 2) - 5;
     const circumference = 2 * Math.PI * radius;
-
     const svgNs = "http://www.w3.org/2000/svg";
     state.ring = document.createElementNS(svgNs, "svg");
     state.ring.setAttribute("class", "hh-ring");
@@ -549,7 +651,6 @@ function startLongPress() {
     state.ring.setAttribute("viewBox", `0 0 ${ringSize} ${ringSize}`);
     state.ring.style.left = `-12px`;
     state.ring.style.top = `-12px`;
-
     const bg = document.createElementNS(svgNs, "circle");
     bg.setAttribute("cx", ringSize / 2);
     bg.setAttribute("cy", ringSize / 2);
@@ -557,7 +658,6 @@ function startLongPress() {
     bg.setAttribute("fill", "none");
     bg.setAttribute("stroke", "rgba(215,120,155,.2)");
     bg.setAttribute("stroke-width", "3");
-
     const fg = document.createElementNS(svgNs, "circle");
     fg.setAttribute("class", "hh-ring-fg");
     fg.setAttribute("cx", ringSize / 2);
@@ -570,11 +670,9 @@ function startLongPress() {
     fg.setAttribute("stroke-dasharray", String(circumference));
     fg.setAttribute("stroke-dashoffset", String(circumference));
     fg.setAttribute("transform", `rotate(-90 ${ringSize/2} ${ringSize/2})`);
-
     state.ring.appendChild(bg);
     state.ring.appendChild(fg);
     state.pet.appendChild(state.ring);
-
     function tick() {
         if (state.ringStart === null) return;
         const elapsed = performance.now() - state.ringStart;
@@ -639,7 +737,7 @@ function bindInputs() {
             state.drag.moved = true;
             state.status = "dragging";
             cancelLongPress();
-            sayQueued(pickOne(LINES.drag), "tense", 2500);
+            sayQueued(pickOne(LINES.drag), "tense", "drag");
         }
         if (state.drag.moved) {
             state.x = ev.clientX - state.drag.ox;
@@ -670,7 +768,6 @@ function bindInputs() {
             state.status = "idle";
         }
     };
-
     state.pet.addEventListener("mousedown", onDown);
     state.pet.addEventListener("touchstart", onDown, { passive: false });
     window.addEventListener("mousemove", onMove);
@@ -678,14 +775,12 @@ function bindInputs() {
     window.addEventListener("mouseup", onUp);
     window.addEventListener("touchend", onUp);
     window.addEventListener("touchcancel", onUp);
-
     state.pet.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         unlockAudio();
         cancelLongPress();
         togglePanel(e.clientX, e.clientY);
     });
-
     window.addEventListener("resize", () => {
         const s = settings();
         state.x = clamp(state.x, 0, window.innerWidth - s.size);
@@ -698,16 +793,13 @@ function handleClick() {
     state.clickStreak++;
     if (state.clickResetTimer) clearTimeout(state.clickResetTimer);
     state.clickResetTimer = setTimeout(() => state.clickStreak = 0, 2200);
-
-    let line, mood;
-    if (state.clickStreak >= 6) { line = pickOne(LINES.clickSad); mood = "sad"; }
-    else if (state.clickStreak >= 3) { line = pickOne(LINES.clickAngry); mood = "angry"; }
-    else { line = pickOne(LINES.click); mood = "tense"; }
-
-    state.queue.length = 0;
-    state.queueRunning = false;
-    sayQueued(line, mood, 2500);
-
+    let line, mood, category;
+    if (state.clickStreak >= 6) { line = pickOne(LINES.clickSad); mood = "sad"; category = "clickSad"; }
+    else if (state.clickStreak >= 3) { line = pickOne(LINES.clickAngry); mood = "angry"; category = "clickAngry"; }
+    else { line = pickOne(LINES.click); mood = "tense"; category = "click"; }
+    // Keep a small queue (don't blow up current line on rapid taps)
+    if (state.queue.length > 1) state.queue.length = 1;
+    sayQueued(line, mood, category);
     state.pet.classList.remove("hh-bounce");
     void state.pet.offsetWidth;
     state.pet.classList.add("hh-bounce");
@@ -715,17 +807,14 @@ function handleClick() {
 
 // ───────────────────────────── Ham tag interception ─────────────────────────────
 const HAM_RE = /<ham\s+mood=['"]([a-z_]+)['"]\s*>([\s\S]*?)<\/ham>/gi;
-
 function processMessage(messageId) {
     const s = settings();
     if (!s.enabled || !s.interceptHam) return;
     const ctx = getContext();
     const msg = ctx?.chat?.[messageId];
     if (!msg || !msg.mes || msg.is_user) return;
-
     const matches = [...msg.mes.matchAll(HAM_RE)];
     if (!matches.length) return;
-
     if (s.hideRegexBubble) {
         const mesDom = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
         if (mesDom) {
@@ -737,7 +826,7 @@ function processMessage(messageId) {
     for (const m of matches) {
         const mood = (m[1] || "normal").toLowerCase();
         const text = (m[2] || "").trim().replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
-        if (text) sayQueued(text, mood);
+        if (text) sayQueued(text, mood, "hamFallback");
     }
 }
 
@@ -747,7 +836,7 @@ function togglePanel(x, y) {
     const s = settings();
     const voices = loadVoices();
     const voiceOptions = voices.length
-        ? `<option value="">🎲 อัตโนมัติ (เลือกเสียงไทยที่ดีที่สุด)</option>` +
+        ? `<option value="">🎲 อัตโนมัติ</option>` +
           voices.map(v => {
               const isThai = /th/i.test(v.lang);
               const label = `${isThai ? "🇹🇭 " : ""}${v.name} (${v.lang})`;
@@ -755,6 +844,13 @@ function togglePanel(x, y) {
               return `<option value="${v.name.replace(/"/g, "&quot;")}" ${v.name===s.ttsVoice?"selected":""}>${safe}</option>`;
           }).join("")
         : `<option value="">⏳ กำลังโหลดเสียง... ลองปิด-เปิดเมนูใหม่</option>`;
+
+    const elVoiceOptions = (s.elVoices || []).length
+        ? `<option value="">— เลือก voice —</option>` +
+          s.elVoices.map(v => `<option value="${v.voice_id}" ${v.voice_id===s.elVoiceId?"selected":""}>${v.name} (${v.category||""})</option>`).join("")
+        : `<option value="">${s.elVoiceId ? `(ใช้: ${s.elVoiceId.slice(0,8)}...)` : "ยังไม่ได้โหลดรายการ"}</option>`;
+
+    const customAudioJson = JSON.stringify(s.customAudio || {}, null, 2);
 
     const p = document.createElement("div");
     p.id = "hh-panel";
@@ -773,22 +869,77 @@ function togglePanel(x, y) {
         <div class="hh-section">🎙️ เสียง</div>
         <label class="hh-row hh-col"><span>โหมดเสียง</span>
             <select data-k="voiceMode">
-                <option value="tts" ${s.voiceMode==="tts"?"selected":""}>📢 พูดออกเสียง (TTS)</option>
-                <option value="chitter" ${s.voiceMode==="chitter"?"selected":""}>🐹 เสียงปี๊ๆ (chitter)</option>
-                <option value="off" ${s.voiceMode==="off"?"selected":""}>🔇 ปิดเสียง</option>
+                <option value="off" ${s.voiceMode==="off"?"selected":""}>🔇 ปิดเสียง (แนะนำ)</option>
+                <option value="elevenlabs" ${s.voiceMode==="elevenlabs"?"selected":""}>✨ ElevenLabs (เสียงธรรมชาติ / clone)</option>
+                <option value="custom" ${s.voiceMode==="custom"?"selected":""}>📼 อัดเสียงเอง (MP3 URL)</option>
+                <option value="tts" ${s.voiceMode==="tts"?"selected":""}>📢 Browser TTS (หุ่นยนต์ ฟรี)</option>
             </select>
         </label>
-        <div class="hh-tts-block" style="display:${s.voiceMode==="tts"?"block":"none"}">
-            <label class="hh-row hh-col"><span>เสียงพูด (เลือกได้!)</span>
-                <select data-k="ttsVoice">${voiceOptions}</select>
+        <div class="hh-info" style="display:${s.voiceMode==="off"?"block":"none"}" data-show="off">
+            ✨ ปิดเสียงเป็น default เพราะเบราเซอร์ไม่มีเสียงน่ารักจริงๆ ให้ใช้<br>
+            ถ้าอยากได้เสียงธรรมชาติ → ใช้ ElevenLabs (เสียง clone)<br>
+            ถ้าอยากใช้เสียงตัวเอง → อัด MP3 แล้วใส่ URL
+        </div>
+
+        <div class="hh-eleven-block" style="display:${s.voiceMode==="elevenlabs"?"block":"none"}">
+            <div class="hh-info">
+                📌 <b>วิธี:</b> สมัครฟรีที่ <a href="https://elevenlabs.io" target="_blank">elevenlabs.io</a><br>
+                1. Profile → API Keys → Create → Copy<br>
+                2. Voice Library → Voice Lab → Add Voice → <b>Instant Voice Clone</b><br>
+                3. อัดเสียงตัวเอง 1-5 นาที (อ่านอะไรก็ได้ ในที่เงียบ)<br>
+                4. กดปุ่ม "ดึง voices" ข้างล่าง → เลือกเสียงตัวเอง<br>
+                💰 ฟรี 10 นาที/เดือน, $5/เดือน หลังจากนั้น
+            </div>
+            <label class="hh-row hh-col"><span>API Key</span>
+                <input type="password" data-k="elKey" value="${s.elKey || ""}" placeholder="sk_...">
             </label>
-            <label class="hh-row"><span>เสียงสูงเพิ่ม <span class="hh-val">${s.ttsPitchBoost>=0?"+":""}${s.ttsPitchBoost.toFixed(2)}</span></span><input type="range" min="-50" max="25" step="5" data-k="ttsPitchBoost" value="${s.ttsPitchBoost*100}"></label>
-            <label class="hh-row"><span>ความเร็ว <span class="hh-val">${s.ttsRate.toFixed(2)}x</span></span><input type="range" min="60" max="140" step="5" data-k="ttsRate" value="${s.ttsRate*100}"></label>
+            <button class="hh-fetch-voices">🔄 ดึงรายการ voices</button>
+            <label class="hh-row hh-col"><span>เลือก Voice</span>
+                <select data-k="elVoiceId">${elVoiceOptions}</select>
+            </label>
+            <label class="hh-row hh-col"><span>หรือใส่ Voice ID เอง</span>
+                <input type="text" data-k="elVoiceIdManual" value="${s.elVoiceId || ""}" placeholder="21m00Tcm4TlvDq8ikWAM">
+            </label>
+            <label class="hh-row hh-col"><span>โมเดล</span>
+                <select data-k="elModelId">
+                    <option value="eleven_multilingual_v2" ${s.elModelId==="eleven_multilingual_v2"?"selected":""}>Multilingual v2 (คุณภาพสูง)</option>
+                    <option value="eleven_turbo_v2_5" ${s.elModelId==="eleven_turbo_v2_5"?"selected":""}>Turbo v2.5 (เร็ว ประหยัด credit)</option>
+                    <option value="eleven_flash_v2_5" ${s.elModelId==="eleven_flash_v2_5"?"selected":""}>Flash v2.5 (เร็วสุด)</option>
+                </select>
+            </label>
             <label class="hh-row"><span>ความดัง <span class="hh-val">${Math.round(s.ttsVolume*100)}%</span></span><input type="range" min="0" max="100" step="5" data-k="ttsVolume" value="${s.ttsVolume*100}"></label>
             <button class="hh-test-btn">▶️ ทดสอบเสียง</button>
         </div>
-        <div class="hh-chitter-block" style="display:${s.voiceMode==="chitter"?"block":"none"}">
-            <label class="hh-row"><span>ดังเสียงปี๊ <span class="hh-val">${Math.round(s.chitterVolume*100)}%</span></span><input type="range" min="0" max="50" step="2" data-k="chitterVolume" value="${s.chitterVolume*100}"></label>
+
+        <div class="hh-custom-block" style="display:${s.voiceMode==="custom"?"block":"none"}">
+            <div class="hh-info">
+                📼 <b>วิธี:</b> อัดเสียงพูดประโยคของแฮมๆ ด้วยเสียงตัวเอง บันทึกเป็น MP3<br>
+                อัปโหลดไปที่ github (เป็น raw URL) หรือ Google Drive (link share)<br>
+                แล้วใส่ JSON ตามรูปแบบนี้:<br><br>
+                หมวดที่ใช้ได้: <code>click, clickAngry, clickSad, drag, blocking, idle, greeting, hamFallback</code><br>
+                แต่ละหมวดเป็น array URL — ระบบจะสุ่มเล่น
+            </div>
+            <label class="hh-row hh-col"><span>JSON Audio Map</span>
+                <textarea data-k="customAudio" rows="8" placeholder='{
+  "click": ["https://.../click1.mp3", "https://.../click2.mp3"],
+  "drag": ["https://.../drag1.mp3"]
+}'>${customAudioJson === "{}" ? "" : customAudioJson}</textarea>
+            </label>
+            <label class="hh-row"><span>ความดัง <span class="hh-val">${Math.round(s.ttsVolume*100)}%</span></span><input type="range" min="0" max="100" step="5" data-k="ttsVolume" value="${s.ttsVolume*100}"></label>
+            <button class="hh-test-btn">▶️ ทดสอบ (สุ่มจาก click)</button>
+        </div>
+
+        <div class="hh-tts-block" style="display:${s.voiceMode==="tts"?"block":"none"}">
+            <div class="hh-info">
+                ⚠️ Browser TTS ใช้เสียงระบบ OS ฟังเป็นหุ่นยนต์ทุกตัว ไม่ค่อยน่ารัก<br>
+                แนะนำให้ใช้ ElevenLabs หรือ Custom Audio แทน
+            </div>
+            <label class="hh-row hh-col"><span>เสียง</span>
+                <select data-k="ttsVoice">${voiceOptions}</select>
+            </label>
+            <label class="hh-row"><span>Pitch <span class="hh-val">${s.ttsPitchBoost>=0?"+":""}${s.ttsPitchBoost.toFixed(2)}</span></span><input type="range" min="-50" max="25" step="5" data-k="ttsPitchBoost" value="${s.ttsPitchBoost*100}"></label>
+            <label class="hh-row"><span>Rate <span class="hh-val">${s.ttsRate.toFixed(2)}x</span></span><input type="range" min="60" max="140" step="5" data-k="ttsRate" value="${s.ttsRate*100}"></label>
+            <label class="hh-row"><span>Volume <span class="hh-val">${Math.round(s.ttsVolume*100)}%</span></span><input type="range" min="0" max="100" step="5" data-k="ttsVolume" value="${s.ttsVolume*100}"></label>
             <button class="hh-test-btn">▶️ ทดสอบเสียง</button>
         </div>
 
@@ -801,19 +952,27 @@ function togglePanel(x, y) {
     `;
     document.body.appendChild(p);
     state.panel = p;
-    const px = clamp(x - 135, 8, window.innerWidth - 290);
-    const py = clamp(y - 50, 8, window.innerHeight - 580);
+    const px = clamp(x - 145, 8, window.innerWidth - 300);
+    const py = clamp(y - 50, 8, window.innerHeight - 600);
     p.style.left = `${px}px`;
     p.style.top = `${py}px`;
 
-    p.querySelectorAll("input, select").forEach(inp => {
+    function refreshBlocks(mode) {
+        p.querySelector(".hh-eleven-block").style.display = mode === "elevenlabs" ? "block" : "none";
+        p.querySelector(".hh-custom-block").style.display = mode === "custom" ? "block" : "none";
+        p.querySelector(".hh-tts-block").style.display = mode === "tts" ? "block" : "none";
+        const offInfo = p.querySelector('[data-show="off"]');
+        if (offInfo) offInfo.style.display = mode === "off" ? "block" : "none";
+    }
+
+    p.querySelectorAll("input, select, textarea").forEach(inp => {
         inp.addEventListener("change", () => {
             const k = inp.dataset.k;
             const cur = settings();
             if (inp.type === "checkbox") cur[k] = inp.checked;
             else if (inp.type === "range") {
                 let v = parseFloat(inp.value);
-                if (k === "ttsPitchBoost" || k === "ttsRate" || k === "ttsVolume" || k === "chitterVolume") v = v / 100;
+                if (k === "ttsPitchBoost" || k === "ttsRate" || k === "ttsVolume") v = v / 100;
                 cur[k] = v;
                 const valEl = inp.parentElement.querySelector(".hh-val");
                 if (valEl) {
@@ -829,10 +988,24 @@ function togglePanel(x, y) {
                 }
             } else if (inp.tagName === "SELECT") {
                 cur[k] = inp.value;
-                if (k === "voiceMode") {
-                    p.querySelector(".hh-tts-block").style.display = cur[k] === "tts" ? "block" : "none";
-                    p.querySelector(".hh-chitter-block").style.display = cur[k] === "chitter" ? "block" : "none";
+                if (k === "voiceMode") refreshBlocks(cur[k]);
+                if (k === "elVoiceId") {
+                    const manual = p.querySelector('input[data-k="elVoiceIdManual"]');
+                    if (manual) manual.value = cur[k];
                 }
+            } else if (inp.tagName === "TEXTAREA") {
+                if (k === "customAudio") {
+                    try {
+                        cur.customAudio = inp.value.trim() ? JSON.parse(inp.value) : {};
+                        inp.style.borderColor = "#d7789b";
+                    } catch (_) {
+                        inp.style.borderColor = "#da5864";
+                        return; // don't save invalid
+                    }
+                }
+            } else if (inp.type === "password" || inp.type === "text") {
+                if (k === "elVoiceIdManual") cur.elVoiceId = inp.value.trim();
+                else cur[k] = inp.value.trim();
             }
             save();
             if (k === "enabled") {
@@ -841,21 +1014,42 @@ function togglePanel(x, y) {
             }
         });
     });
+
+    p.querySelector(".hh-fetch-voices")?.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const cur = settings();
+        const keyInput = p.querySelector('input[data-k="elKey"]');
+        const apiKey = (keyInput?.value || cur.elKey || "").trim();
+        if (!apiKey) { alert("ใส่ API Key ก่อนนะคะ"); return; }
+        e.target.textContent = "⏳ กำลังโหลด...";
+        e.target.disabled = true;
+        const list = await fetchElevenVoices(apiKey);
+        e.target.textContent = "🔄 ดึงรายการ voices";
+        e.target.disabled = false;
+        if (!list.length) { alert("โหลดไม่สำเร็จ — ตรวจ API Key อีกที"); return; }
+        cur.elVoices = list;
+        cur.elKey = apiKey;
+        save();
+        const sel = p.querySelector('select[data-k="elVoiceId"]');
+        if (sel) {
+            sel.innerHTML = `<option value="">— เลือก voice —</option>` +
+                list.map(v => `<option value="${v.voice_id}" ${v.voice_id===cur.elVoiceId?"selected":""}>${v.name} (${v.category||""})</option>`).join("");
+        }
+    });
+
     p.querySelectorAll(".hh-test-btn").forEach(btn => {
         btn.addEventListener("click", (e) => {
             e.stopPropagation();
             unlockAudio();
-            const sample = pickOne(["สวัสดีค่า แฮมๆ มาแล้วน้า", "พี่จ๋า คิดถึงเลยน้า", "เย้! ได้ทดสอบเสียงแล้ว", "ทดสอบ ทดสอบ ฮัลโหลล!"]);
-            setMood("happy");
-            showBubble(sample, 3500);
-            vocalize(sample, "happy");
+            const sample = pickOne(["สวัสดีค่า แฮม แฮม มาแล้วน้า", "พี่จ๋า คิดถึงเลยน้า", "เย้ ได้ทดสอบเสียงแล้ว"]);
+            sayQueued(sample, "happy", "click");
         });
     });
     p.querySelectorAll("[data-mood]").forEach(b => {
         b.addEventListener("click", (e) => {
             e.stopPropagation();
             unlockAudio();
-            sayQueued(`mood: ${b.dataset.mood} ✨`, b.dataset.mood, 2500);
+            sayQueued(`mood: ${b.dataset.mood}`, b.dataset.mood, null);
         });
     });
     p.querySelector(".hh-close").addEventListener("click", () => { p.remove(); state.panel = null; });
@@ -881,7 +1075,6 @@ function boot() {
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, processMessage);
     eventSource.on(event_types.MESSAGE_SWIPED, processMessage);
     eventSource.on(event_types.MESSAGE_EDITED, processMessage);
-
     const unlocker = () => {
         unlockAudio();
         document.removeEventListener("click", unlocker);
@@ -889,7 +1082,6 @@ function boot() {
     };
     document.addEventListener("click", unlocker);
     document.addEventListener("touchstart", unlocker);
-
     document.addEventListener("visibilitychange", () => {
         if (document.hidden && state.walkTimer) clearTimeout(state.walkTimer);
         else scheduleWalk();
