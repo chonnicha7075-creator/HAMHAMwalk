@@ -212,6 +212,7 @@ const DEFAULTS = {
     elModelId: "eleven_multilingual_v2",
     elVoices: [],
     customAudio: {},
+    squeakVolume: 0.12,
 };
 
 // ───────────────────────────── State ─────────────────────────────
@@ -241,6 +242,44 @@ const state = {
 };
 
 const audioCache = new Map();
+
+// Speech history (last 30 lines spoken)
+const speechHistory = [];
+const HISTORY_MAX = 30;
+function logSpeech(text, mood) {
+    speechHistory.unshift({ text, mood, timestamp: Date.now() });
+    if (speechHistory.length > HISTORY_MAX) speechHistory.length = HISTORY_MAX;
+    // refresh history view if open
+    refreshHistoryView();
+}
+function refreshHistoryView() {
+    if (!state.panel) return;
+    const list = state.panel.querySelector(".hh-history");
+    if (list) list.innerHTML = renderHistoryItems();
+}
+function timeAgo(ts) {
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 5) return "เพิ่งกี้";
+    if (diff < 60) return `${diff} วิที่แล้ว`;
+    const m = Math.floor(diff / 60);
+    if (m < 60) return `${m} นาทีที่แล้ว`;
+    const h = Math.floor(m / 60);
+    return `${h} ชม.ที่แล้ว`;
+}
+function escapeHtml(s) {
+    return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function renderHistoryItems() {
+    if (!speechHistory.length) {
+        return `<div class="hh-history-empty">ยังไม่ได้พูดอะไรเลย รอแฮมพูดก่อนน้า~</div>`;
+    }
+    return speechHistory.map(h => `
+        <div class="hh-history-item hh-mood-${h.mood}">
+            <div class="hh-history-text">${escapeHtml(h.text)}</div>
+            <div class="hh-history-meta">${timeAgo(h.timestamp)} · ${h.mood}</div>
+        </div>
+    `).join("");
+}
 
 // ───────────────────────────── Utils ─────────────────────────────
 const pickOne = (arr) => arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
@@ -429,9 +468,89 @@ async function speakCustomAudio(text, mood, category) {
     return playAudioUrl(url, s.ttsVolume ?? 0.85);
 }
 
+// ───────────────────────────── Cute hamster squeak ─────────────────────────────
+// Short, high-pitch squeaks that sound like an actual hamster — not robotic beeps.
+// 2-3 squeaks per line, played at start only, with random tiny gaps.
+let _squeakCtx = null;
+function getSqueakCtx() {
+    if (!_squeakCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        _squeakCtx = new Ctx();
+    }
+    return _squeakCtx;
+}
+
+const MOOD_SQUEAK = {
+    happy:    { pitch: 1.25, count: 3 },
+    curious:  { pitch: 1.15, count: 2 },
+    normal:   { pitch: 1.00, count: 2 },
+    nsfw:     { pitch: 1.05, count: 2 },
+    scheming: { pitch: 0.95, count: 3 },
+    tense:    { pitch: 1.10, count: 3 },
+    angry:    { pitch: 0.85, count: 4 },
+    sad:      { pitch: 0.75, count: 1 },
+};
+
+function squeak(mood = "normal") {
+    const ctx = getSqueakCtx();
+    if (!ctx) return Promise.resolve();
+    if (ctx.state === "suspended") {
+        ctx.resume();
+        if (ctx.state === "suspended") return Promise.resolve();
+    }
+    const s = settings();
+    const vol = clamp(s.squeakVolume ?? 0.12, 0, 0.5);
+    const cfg = MOOD_SQUEAK[mood] || MOOD_SQUEAK.normal;
+    const count = cfg.count;
+    const moodPitch = cfg.pitch;
+    const now = ctx.currentTime;
+
+    let cursor = 0;
+    let totalDur = 0;
+    for (let i = 0; i < count; i++) {
+        const start = now + cursor;
+        // Each squeak: 70-110ms, pitch sweeps UP fast then down (like a real squeak)
+        const dur = 0.07 + Math.random() * 0.04;
+        const basePitch = (1300 + Math.random() * 400) * moodPitch;
+
+        // Use sine for softness; add a touch of noise via slight detune
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        osc.type = "sine";
+
+        // Fast rising sweep, then quick decay — mimics rodent squeak
+        osc.frequency.setValueAtTime(basePitch * 0.7, start);
+        osc.frequency.exponentialRampToValueAtTime(basePitch * 1.3, start + dur * 0.25);
+        osc.frequency.exponentialRampToValueAtTime(basePitch * 0.85, start + dur);
+
+        // Soft lowpass keeps it warm not piercing
+        filter.type = "lowpass";
+        filter.frequency.value = 4500;
+        filter.Q.value = 0.7;
+
+        // Gentle envelope — quick attack, smooth decay
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(vol, start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+        osc.connect(filter).connect(gain).connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + dur + 0.02);
+
+        // Random gap 60-160ms between squeaks
+        cursor += dur + 0.06 + Math.random() * 0.10;
+        totalDur = cursor;
+    }
+    // Resolve roughly when squeaks finish
+    return new Promise(r => setTimeout(r, Math.ceil(totalDur * 1000) + 50));
+}
+
 async function vocalize(text, mood, category) {
     const s = settings();
     if (s.voiceMode === "off") return;
+    if (s.voiceMode === "squeak") return squeak(mood);
     if (s.voiceMode === "elevenlabs") return speakElevenLabs(text, mood);
     if (s.voiceMode === "custom") return speakCustomAudio(text, mood, category);
     if (s.voiceMode === "tts") return speakTTS(text, mood);
@@ -564,6 +683,7 @@ async function runQueue() {
             const item = state.queue.shift();
             setMood(item.mood);
             showBubble(item.text);
+            logSpeech(item.text, item.mood);
             state.status = "talking";
             const minWait = new Promise(r => setTimeout(r, readingTime(item.text)));
             const speech = vocalize(item.text, item.mood, item.category) || Promise.resolve();
@@ -1028,14 +1148,24 @@ function togglePanel(x, y) {
         <div class="hh-section">🎙️ เสียง</div>
         <label class="hh-row hh-col"><span>โหมดเสียง</span>
             <select data-k="voiceMode">
-                <option value="off" ${s.voiceMode==="off"?"selected":""}>🔇 ปิดเสียง (แนะนำ)</option>
-                <option value="elevenlabs" ${s.voiceMode==="elevenlabs"?"selected":""}>✨ ElevenLabs</option>
+                <option value="off" ${s.voiceMode==="off"?"selected":""}>🔇 ปิดเสียง</option>
+                <option value="squeak" ${s.voiceMode==="squeak"?"selected":""}>🐹 จี๊ดๆ แบบหนูแฮม (น่ารัก)</option>
+                <option value="elevenlabs" ${s.voiceMode==="elevenlabs"?"selected":""}>✨ ElevenLabs (เสียงคนจริง)</option>
                 <option value="custom" ${s.voiceMode==="custom"?"selected":""}>📼 อัดเสียงเอง (MP3 URL)</option>
                 <option value="tts" ${s.voiceMode==="tts"?"selected":""}>📢 Browser TTS (หุ่นยนต์)</option>
             </select>
         </label>
         <div class="hh-info" data-show="off" style="display:${s.voiceMode==="off"?"block":"none"}">
             ✨ Default ปิดเสียง เพราะเบราเซอร์ไม่มีเสียงน่ารักจริงๆ
+        </div>
+
+        <div class="hh-squeak-block" style="display:${s.voiceMode==="squeak"?"block":"none"}">
+            <div class="hh-info">
+                🐹 เสียงจี๊ดๆ สั้นๆ 2-4 ครั้งตอนแฮมพูด — ฟังคล้ายเสียงหนูแฮมเตอร์จริง<br>
+                ไม่อ่านทุกพยางค์ น่ารักไม่รำคาญหู
+            </div>
+            <label class="hh-row"><span>ดังเสียงจี๊ด <span class="hh-val">${Math.round((s.squeakVolume??0.12)*100)}%</span></span><input type="range" min="0" max="40" step="2" data-k="squeakVolume" value="${(s.squeakVolume??0.12)*100}"></label>
+            <button class="hh-test-btn">▶️ ทดสอบเสียง</button>
         </div>
 
         <div class="hh-eleven-block" style="display:${s.voiceMode==="elevenlabs"?"block":"none"}">
@@ -1089,6 +1219,9 @@ function togglePanel(x, y) {
             <button class="hh-test-btn">▶️ ทดสอบเสียง</button>
         </div>
 
+        <div class="hh-section">📜 แฮมพึ่งพูดอะไรไป</div>
+        <div class="hh-history">${renderHistoryItems()}</div>
+
         <div class="hh-section">✨ ลอง mood</div>
         <div class="hh-moods">
             ${Object.keys(SPRITES).map(m => `<button data-mood="${m}">${m}</button>`).join("")}
@@ -1110,6 +1243,7 @@ function togglePanel(x, y) {
         p.querySelector(".hh-eleven-block").style.display = mode === "elevenlabs" ? "block" : "none";
         p.querySelector(".hh-custom-block").style.display = mode === "custom" ? "block" : "none";
         p.querySelector(".hh-tts-block").style.display = mode === "tts" ? "block" : "none";
+        p.querySelector(".hh-squeak-block").style.display = mode === "squeak" ? "block" : "none";
         const offInfo = p.querySelector('[data-show="off"]');
         if (offInfo) offInfo.style.display = mode === "off" ? "block" : "none";
     }
@@ -1125,7 +1259,7 @@ function togglePanel(x, y) {
             if (inp.type === "checkbox") cur[k] = inp.checked;
             else if (inp.type === "range") {
                 let v = parseFloat(inp.value);
-                if (k === "ttsPitchBoost" || k === "ttsRate" || k === "ttsVolume") v = v / 100;
+                if (k === "ttsPitchBoost" || k === "ttsRate" || k === "ttsVolume" || k === "squeakVolume") v = v / 100;
                 cur[k] = v;
                 const valEl = inp.parentElement.querySelector(".hh-val");
                 if (valEl) {
@@ -1250,4 +1384,4 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
 } else {
     setTimeout(boot, 400);
-    }
+        }
