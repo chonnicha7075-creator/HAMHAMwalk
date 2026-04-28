@@ -96,7 +96,7 @@
     50% { translate: 2px 0; }
 }
 
-/* RPS: CELEBRATE — happy hop with sparkles */
+/* RPS: CELEBRATE — happy hop */
 #hh-pet.hh-celebrate .hh-inner {
     animation: hh-celebrate-hop .55s cubic-bezier(.36,.07,.19,.97) infinite;
 }
@@ -105,20 +105,6 @@
     25%      { transform: scaleX(var(--flip)) translateY(-18px) rotate(-8deg); }
     50%      { transform: scaleX(var(--flip)) translateY(-2px) rotate(0deg) scale(1.1, .95); }
     75%      { transform: scaleX(var(--flip)) translateY(-12px) rotate(8deg); }
-}
-#hh-pet.hh-celebrate::after {
-    content: "✨💖✨";
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 18px;
-    animation: hh-celebrate-sparkle 1s ease-in-out infinite;
-    z-index: 2;
-}
-@keyframes hh-celebrate-sparkle {
-    0%, 100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-    50%      { opacity: .6; transform: translateX(-50%) translateY(-6px) scale(1.2); }
 }
 
 /* Long-press progress ring */
