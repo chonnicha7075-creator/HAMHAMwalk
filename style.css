@@ -33,37 +33,30 @@
     pointer-events: none;
     -webkit-user-drag: none;
     user-drag: none;
-    animation: hh-idle-wiggle 1.6s ease-in-out infinite;
-    transform-origin: center bottom;
+    animation: hh-breath 2.6s ease-in-out infinite;
 }
-/* Idle: cute wiggle — squish + tiny tilt + breath */
-@keyframes hh-idle-wiggle {
-    0%, 100% { transform: scale(1, 1) rotate(0deg) translateY(0); }
-    25%      { transform: scale(1.04, 0.96) rotate(-2deg) translateY(0); }
-    50%      { transform: scale(0.98, 1.02) rotate(0deg) translateY(-2px); }
-    75%      { transform: scale(1.04, 0.96) rotate(2deg) translateY(0); }
+@keyframes hh-breath {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.03); }
 }
 
-/* Walking horizontally → bouncy hop */
+/* Walking horizontally → bounce up-down */
 #hh-pet.hh-walking:not(.hh-climbing) .hh-sprite {
-    animation: hh-walk-hop .38s ease-in-out infinite;
+    animation: hh-walk-bounce .42s ease-in-out infinite;
 }
-@keyframes hh-walk-hop {
-    0%, 100% { transform: scale(1, 1) translateY(0) rotate(0deg); }
-    25%      { transform: scale(1.05, 0.92) translateY(0) rotate(-3deg); }
-    50%      { transform: scale(0.96, 1.06) translateY(-7px) rotate(0deg); }
-    75%      { transform: scale(1.05, 0.92) translateY(0) rotate(3deg); }
+@keyframes hh-walk-bounce {
+    0%, 100% { transform: scale(1) translateY(0); }
+    50%      { transform: scale(1.02) translateY(-4px); }
 }
 
-/* Climbing vertically → grippy wiggle (left-right paw movement) */
+/* Climbing vertically → tiny side-to-side wiggle */
 #hh-pet.hh-walking.hh-climbing .hh-sprite {
-    animation: hh-climb-wiggle .42s ease-in-out infinite;
+    animation: hh-climb-wiggle .5s ease-in-out infinite;
 }
 @keyframes hh-climb-wiggle {
-    0%, 100% { transform: scale(1, 1) translateX(0) rotate(0deg); }
-    25%      { transform: scale(1.02, 0.98) translateX(-3px) rotate(-2deg); }
-    50%      { transform: scale(0.99, 1.01) translateX(0) rotate(0deg); }
-    75%      { transform: scale(1.02, 0.98) translateX(3px) rotate(2deg); }
+    0%, 100% { transform: scale(1) translateX(0); }
+    25%      { transform: scale(1.01) translateX(-2px); }
+    75%      { transform: scale(1.01) translateX(2px); }
 }
 
 /* CLICK BOUNCE */
@@ -127,9 +120,7 @@
     font-size: 14px;
     font-weight: 600;
     line-height: 1.55;
-    min-width: 80px;
-    max-width: min(240px, calc(100vw - 32px));
-    width: max-content;
+    max-width: 240px;
     z-index: 9999;
     opacity: 0;
     transform: translate(-50%, -100%) scale(.6);
@@ -139,9 +130,7 @@
     box-shadow: 0 8px 22px rgba(215, 120, 155, .28), 0 1px 0 rgba(255, 255, 255, .9) inset;
     white-space: pre-wrap;
     word-break: break-word;
-    overflow-wrap: break-word;
     letter-spacing: .01em;
-    box-sizing: border-box;
 }
 #hh-bubble.hh-visible { opacity: 1; transform: translate(-50%, -100%) scale(1); }
 #hh-bubble::before, #hh-bubble::after {
@@ -175,36 +164,38 @@
     border-width: 8px;
 }
 
-/* RPS modal — bullet-proof centering against ST's parent transforms */
+/* RPS modal */
 #hh-rps {
-    background: rgba(60, 25, 45, 0.45) !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 10001;
+    background: rgba(60, 25, 45, 0.45);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
     animation: hh-rps-bg-in .25s ease;
     font-family: 'Mali', 'Sarabun', system-ui, sans-serif;
-    overflow: hidden;
 }
 @keyframes hh-rps-bg-in { from { opacity: 0; } to { opacity: 1; } }
 .hh-rps-card {
-    position: relative;
+    position: fixed;
+    top: 50%;
+    left: 50%;
     background: linear-gradient(160deg, #fff5f9 0%, #ffd9e8 100%);
     border: 3px solid #d7789b;
     border-radius: 24px;
     padding: 22px 24px;
     width: min(340px, 90vw);
-    max-height: 90vh;
-    overflow-y: auto;
     text-align: center;
     box-shadow: 0 18px 50px rgba(215, 120, 155, .55), 0 2px 0 rgba(255, 255, 255, .9) inset;
-    animation: hh-rps-card-in .45s cubic-bezier(.34, 1.56, .64, 1);
-    margin: auto;
+    animation: hh-rps-card-in .45s cubic-bezier(.34, 1.56, .64, 1) forwards;
 }
 @keyframes hh-rps-card-in {
-    from { opacity: 0; transform: scale(.5); }
-    to   { opacity: 1; transform: scale(1); }
+    from { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 .hh-rps-title { font-size: 24px; font-weight: 700; color: #a83d62; margin-bottom: 4px; }
 .hh-rps-subtitle { font-size: 13px; color: #6a3050; margin-bottom: 18px; font-weight: 600; }
