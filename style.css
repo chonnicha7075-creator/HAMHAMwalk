@@ -33,30 +33,37 @@
     pointer-events: none;
     -webkit-user-drag: none;
     user-drag: none;
-    animation: hh-breath 2.6s ease-in-out infinite;
+    animation: hh-idle-wiggle 1.6s ease-in-out infinite;
+    transform-origin: center bottom;
 }
-@keyframes hh-breath {
-    0%, 100% { transform: scale(1); }
-    50%      { transform: scale(1.03); }
+/* Idle: cute wiggle — squish + tiny tilt + breath */
+@keyframes hh-idle-wiggle {
+    0%, 100% { transform: scale(1, 1) rotate(0deg) translateY(0); }
+    25%      { transform: scale(1.04, 0.96) rotate(-2deg) translateY(0); }
+    50%      { transform: scale(0.98, 1.02) rotate(0deg) translateY(-2px); }
+    75%      { transform: scale(1.04, 0.96) rotate(2deg) translateY(0); }
 }
 
-/* Walking horizontally → bounce up-down */
+/* Walking horizontally → bouncy hop */
 #hh-pet.hh-walking:not(.hh-climbing) .hh-sprite {
-    animation: hh-walk-bounce .42s ease-in-out infinite;
+    animation: hh-walk-hop .38s ease-in-out infinite;
 }
-@keyframes hh-walk-bounce {
-    0%, 100% { transform: scale(1) translateY(0); }
-    50%      { transform: scale(1.02) translateY(-4px); }
+@keyframes hh-walk-hop {
+    0%, 100% { transform: scale(1, 1) translateY(0) rotate(0deg); }
+    25%      { transform: scale(1.05, 0.92) translateY(0) rotate(-3deg); }
+    50%      { transform: scale(0.96, 1.06) translateY(-7px) rotate(0deg); }
+    75%      { transform: scale(1.05, 0.92) translateY(0) rotate(3deg); }
 }
 
-/* Climbing vertically → tiny side-to-side wiggle */
+/* Climbing vertically → grippy wiggle (left-right paw movement) */
 #hh-pet.hh-walking.hh-climbing .hh-sprite {
-    animation: hh-climb-wiggle .5s ease-in-out infinite;
+    animation: hh-climb-wiggle .42s ease-in-out infinite;
 }
 @keyframes hh-climb-wiggle {
-    0%, 100% { transform: scale(1) translateX(0); }
-    25%      { transform: scale(1.01) translateX(-2px); }
-    75%      { transform: scale(1.01) translateX(2px); }
+    0%, 100% { transform: scale(1, 1) translateX(0) rotate(0deg); }
+    25%      { transform: scale(1.02, 0.98) translateX(-3px) rotate(-2deg); }
+    50%      { transform: scale(0.99, 1.01) translateX(0) rotate(0deg); }
+    75%      { transform: scale(1.02, 0.98) translateX(3px) rotate(2deg); }
 }
 
 /* CLICK BOUNCE */
@@ -120,7 +127,9 @@
     font-size: 14px;
     font-weight: 600;
     line-height: 1.55;
-    max-width: 240px;
+    min-width: 80px;
+    max-width: min(240px, calc(100vw - 32px));
+    width: max-content;
     z-index: 9999;
     opacity: 0;
     transform: translate(-50%, -100%) scale(.6);
@@ -130,7 +139,9 @@
     box-shadow: 0 8px 22px rgba(215, 120, 155, .28), 0 1px 0 rgba(255, 255, 255, .9) inset;
     white-space: pre-wrap;
     word-break: break-word;
+    overflow-wrap: break-word;
     letter-spacing: .01em;
+    box-sizing: border-box;
 }
 #hh-bubble.hh-visible { opacity: 1; transform: translate(-50%, -100%) scale(1); }
 #hh-bubble::before, #hh-bubble::after {
