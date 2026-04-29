@@ -11,10 +11,10 @@ const LONG_PRESS_MS = 5000;
 
 // ───────────────────────────── Sprites (4 directions, single image each) ─────────────────────────────
 const SPRITES = {
-    front: "https://i.postimg.cc/bdcyQPhV/Screenshot-20260429-034459-Chat-GPT.jpg",
+    front: "https://i.postimg.cc/gcsfX3DN/1000045228-removebg-preview.png",
     back:  "https://i.postimg.cc/z3ZznNrP/1000045221-removebg-preview.png",
-    left:  "https://i.postimg.cc/YjKr17Hs/1000045215-removebg-preview.png",
-    right: "https://i.postimg.cc/fknzxsNP/1000045217-removebg-preview.png",
+    left:  "https://i.postimg.cc/fknzxsNP/1000045217-removebg-preview.png",  // swapped
+    right: "https://i.postimg.cc/YjKr17Hs/1000045215-removebg-preview.png",  // swapped
 };
 
 // Single voice profile (no per-mood)
@@ -562,14 +562,33 @@ function setDirection(dir) {
 function positionBubble() {
     if (!state.bubble || !state.pet) return;
     const s = settings();
-    state.bubble.style.left = `${state.x + s.size / 2}px`;
-    state.bubble.style.top = `${state.y - 8}px`;
-    if (state.y < 90) {
+
+    // Make sure bubble is rendered first to measure
+    const bubbleW = state.bubble.offsetWidth || 200;
+    const bubbleH = state.bubble.offsetHeight || 40;
+    const margin = 8;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+
+    // Default: centered above pet
+    let bx = state.x + s.size / 2;
+    let by = state.y - margin;
+    let placeBelow = state.y < bubbleH + 20;
+
+    if (placeBelow) {
+        by = state.y + s.size + margin;
         state.bubble.classList.add("hh-bubble-below");
-        state.bubble.style.top = `${state.y + s.size + 8}px`;
     } else {
         state.bubble.classList.remove("hh-bubble-below");
     }
+
+    // Clamp horizontally so bubble doesn't get squeezed/wrap to vertical
+    const halfW = bubbleW / 2;
+    if (bx - halfW < margin) bx = halfW + margin;
+    if (bx + halfW > W - margin) bx = W - halfW - margin;
+
+    state.bubble.style.left = `${bx}px`;
+    state.bubble.style.top = `${by}px`;
 }
 
 function showBubble(text) {
@@ -1326,4 +1345,4 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
 } else {
     setTimeout(boot, 400);
-        }
+}
