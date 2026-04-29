@@ -11,10 +11,10 @@ const LONG_PRESS_MS = 5000;
 
 // ───────────────────────────── Sprites (4 directions, single image each) ─────────────────────────────
 const SPRITES = {
-    front: "https://i.postimg.cc/bdcyQPhV/Screenshot-20260429-034459-Chat-GPT.jpg",
+    front: "https://i.postimg.cc/gcsfX3DN/1000045228-removebg-preview.png",
     back:  "https://i.postimg.cc/z3ZznNrP/1000045221-removebg-preview.png",
-    left:  "https://i.postimg.cc/YjKr17Hs/1000045215-removebg-preview.png",
-    right: "https://i.postimg.cc/fknzxsNP/1000045217-removebg-preview.png",
+    left:  "https://i.postimg.cc/fknzxsNP/1000045217-removebg-preview.png",  // swapped
+    right: "https://i.postimg.cc/YjKr17Hs/1000045215-removebg-preview.png",  // swapped
 };
 
 // Single voice profile (no per-mood)
@@ -496,10 +496,28 @@ function buildPet() {
     if (state.pet) return;
     const s = settings();
 
+    // Create a root container outside ST's DOM tree to avoid parent transform issues
+    if (!state.rootContainer) {
+        state.rootContainer = document.createElement("div");
+        state.rootContainer.id = "hh-root";
+        state.rootContainer.style.cssText = `
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 0 !important;
+            height: 0 !important;
+            pointer-events: none !important;
+            z-index: 2147483647 !important;
+        `;
+        // Append to documentElement (html), not body — escapes any transformed wrappers
+        document.documentElement.appendChild(state.rootContainer);
+    }
+
     state.pet = document.createElement("div");
     state.pet.id = "hh-pet";
     state.pet.style.width = `${s.size}px`;
     state.pet.style.height = `${s.size}px`;
+    state.pet.style.pointerEvents = "auto";
 
     const inner = document.createElement("div");
     inner.className = "hh-inner";
@@ -516,8 +534,8 @@ function buildPet() {
     state.bubble = document.createElement("div");
     state.bubble.id = "hh-bubble";
 
-    document.body.appendChild(state.pet);
-    document.body.appendChild(state.bubble);
+    state.rootContainer.appendChild(state.pet);
+    state.rootContainer.appendChild(state.bubble);
 
     state.x = s.posX;
     state.y = s.posY;
@@ -539,15 +557,17 @@ function destroyPet() {
     state.bubble?.remove();
     state.panel?.remove();
     state.rpsModal?.remove();
+    state.rootContainer?.remove();
     state.pet = null;
     state.bubble = null;
     state.panel = null;
     state.rpsModal = null;
+    state.rootContainer = null;
 }
 
 function applyTransform() {
     if (!state.pet) return;
-    state.pet.style.transform = `translate(${state.x}px, ${state.y}px)`;
+    state.pet.style.transform = `translate3d(${state.x}px, ${state.y}px, 0)`;
     positionBubble();
 }
 
@@ -562,14 +582,42 @@ function setDirection(dir) {
 function positionBubble() {
     if (!state.bubble || !state.pet) return;
     const s = settings();
-    state.bubble.style.left = `${state.x + s.size / 2}px`;
-    state.bubble.style.top = `${state.y - 8}px`;
-    if (state.y < 90) {
+    const margin = 8;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+
+    // First, force the bubble to natural width by removing fixed sizing
+    state.bubble.style.width = "";
+
+    // Measure
+    const bubbleW = state.bubble.offsetWidth || 200;
+    const bubbleH = state.bubble.offsetHeight || 40;
+
+    // Center horizontally above pet by default
+    let bx = state.x + s.size / 2;
+    let by = state.y - margin;
+    const placeBelow = state.y < bubbleH + 20;
+
+    if (placeBelow) {
+        by = state.y + s.size + margin;
         state.bubble.classList.add("hh-bubble-below");
-        state.bubble.style.top = `${state.y + s.size + 8}px`;
     } else {
         state.bubble.classList.remove("hh-bubble-below");
     }
+
+    // Clamp horizontally — KEY FIX: bubble x range is [halfW + margin, W - halfW - margin]
+    const halfW = bubbleW / 2;
+    const minBx = halfW + margin;
+    const maxBx = W - halfW - margin;
+    if (minBx > maxBx) {
+        // Bubble is wider than screen — pin to left edge
+        bx = halfW + margin;
+    } else {
+        bx = clamp(bx, minBx, maxBx);
+    }
+
+    state.bubble.style.left = `${bx}px`;
+    state.bubble.style.top = `${by}px`;
 }
 
 function showBubble(text) {
@@ -577,7 +625,9 @@ function showBubble(text) {
     if (state.bubbleTimer) { clearTimeout(state.bubbleTimer); state.bubbleTimer = null; }
     state.bubble.textContent = text;
     state.bubble.classList.add("hh-visible");
+    // Position now (rough) and again next frame (accurate, after layout)
     positionBubble();
+    requestAnimationFrame(() => positionBubble());
 }
 
 function hideBubble() {
@@ -942,8 +992,27 @@ function showRPSUI() {
     if (state.rpsModal) { state.rpsModal.remove(); state.rpsModal = null; }
     const rps = document.createElement("div");
     rps.id = "hh-rps";
+    // Force inline styles — covers full viewport, escapes any ST parent transforms
+    rps.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483647 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transform: none !important;
+        pointer-events: auto !important;
+    `;
     rps.innerHTML = `
         <div class="hh-rps-card">
+            <button class="hh-rps-x" aria-label="ปิด">✕</button>
             <div class="hh-rps-title">เป่า ยิง ฉุบ!</div>
             <div class="hh-rps-subtitle">เลือกเลย ใครแพ้ยอม~</div>
             <div class="hh-rps-buttons">
@@ -953,8 +1022,27 @@ function showRPSUI() {
             </div>
         </div>
     `;
-    document.body.appendChild(rps);
+    // Append to documentElement (html) to escape body-level transforms
+    document.documentElement.appendChild(rps);
     state.rpsModal = rps;
+    state._prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    // X button — quit without picking
+    rps.querySelector(".hh-rps-x").addEventListener("click", () => {
+        rps.remove();
+        state.rpsModal = null;
+        document.body.style.overflow = state._prevBodyOverflow || "";
+        state.rpsActive = false;
+        state.clickStreak = 0;
+        sayQueued(pickOne([
+            "เอ้อ ไม่กล้าเล่นเหรอ ฮึ่ม",
+            "หนีหนูเหรอ ขี้แพ้ชะมัด",
+            "เออ ไปเหอะ ขี้กลัว",
+            "หา เลิกแล้วเหรอ น่าน่ารักดี ฮิๆ",
+        ]), "click");
+    });
+
     rps.querySelectorAll("button[data-c]").forEach(b => {
         b.addEventListener("click", () => {
             const userPick = b.dataset.c;
@@ -1008,6 +1096,8 @@ function revealRPS(container, hamPick, userPick) {
     setTimeout(() => {
         container.remove();
         state.rpsModal = null;
+        // restore body scroll
+        document.body.style.overflow = state._prevBodyOverflow || "";
         finishRPS(result);
     }, 2200);
 }
@@ -1183,7 +1273,8 @@ function togglePanel(x, y) {
 
         <button class="hh-close">ปิดเมนู</button>
     `;
-    document.body.appendChild(p);
+    p.style.pointerEvents = "auto";
+    (state.rootContainer || document.documentElement).appendChild(p);
     state.panel = p;
     const px = clamp(x - 145, 8, window.innerWidth - 300);
     const py = clamp(y - 50, 8, window.innerHeight - 600);
@@ -1326,4 +1417,4 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
 } else {
     setTimeout(boot, 400);
-}
+        }
