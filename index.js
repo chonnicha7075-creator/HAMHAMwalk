@@ -961,6 +961,19 @@ function showRPSUI() {
     if (state.rpsModal) { state.rpsModal.remove(); state.rpsModal = null; }
     const rps = document.createElement("div");
     rps.id = "hh-rps";
+    // Force inline styles to override anything ST might apply via parent transforms
+    rps.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483647 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    `;
     rps.innerHTML = `
         <div class="hh-rps-card">
             <div class="hh-rps-title">เป่า ยิง ฉุบ!</div>
@@ -972,8 +985,13 @@ function showRPSUI() {
             </div>
         </div>
     `;
+    // Always append to body root, never to a transformed parent
     document.body.appendChild(rps);
     state.rpsModal = rps;
+    // Lock body scroll while modal is open
+    state._prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     rps.querySelectorAll("button[data-c]").forEach(b => {
         b.addEventListener("click", () => {
             const userPick = b.dataset.c;
@@ -1027,6 +1045,8 @@ function revealRPS(container, hamPick, userPick) {
     setTimeout(() => {
         container.remove();
         state.rpsModal = null;
+        // restore body scroll
+        document.body.style.overflow = state._prevBodyOverflow || "";
         finishRPS(result);
     }, 2200);
 }
