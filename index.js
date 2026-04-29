@@ -11,10 +11,10 @@ const LONG_PRESS_MS = 5000;
 
 // ───────────────────────────── Sprites (4 directions, single image each) ─────────────────────────────
 const SPRITES = {
-    front: "https://i.postimg.cc/gcsfX3DN/1000045228-removebg-preview.png",
+    front: "https://i.postimg.cc/bdcyQPhV/Screenshot-20260429-034459-Chat-GPT.jpg",
     back:  "https://i.postimg.cc/z3ZznNrP/1000045221-removebg-preview.png",
-    left:  "https://i.postimg.cc/fknzxsNP/1000045217-removebg-preview.png",  // swapped
-    right: "https://i.postimg.cc/YjKr17Hs/1000045215-removebg-preview.png",  // swapped
+    left:  "https://i.postimg.cc/YjKr17Hs/1000045215-removebg-preview.png",
+    right: "https://i.postimg.cc/fknzxsNP/1000045217-removebg-preview.png",
 };
 
 // Single voice profile (no per-mood)
@@ -27,13 +27,13 @@ const LINES = {
         "โอ้ย ทำหนูทำไมเนี่ย",
         "อย่าจิ้มสิคะ เจ็บนะ",
         "ฮึ่ง แกล้งหนูตลอดเลย",
-        "พอแล้ว ตัวจะแตกแล้ว",
+        "พอแล้ว ตัวเล็กๆ จะแตกแล้วน้า",
         "หยุดนะ ไม่หยุดร้องนะ",
-        "อ๊ายย จิ้มอะไรของพี่",
+        "อ๊ายย จิ้มอะไรของเธอ",
         "นิ้วใหญ่จัง น่ากลัวอ่ะ",
         "อย่าน้าาา หนูตัวบาง",
         "หนูบอกแล้วไงว่าอย่าจิ้ม",
-        "พี่นี่นะ ขี้แกล้งจังเลย",
+        "เธอนี่นะ ขี้แกล้งจังเลย",
         "ก๊าก ตกใจหมดเลย",
         "พี่นี่นะ ใจร้ายจังเลย ฮึ่ง",
         "ทำไมต้องจิ้มหนูด้วยอ่ะ",
@@ -547,7 +547,7 @@ function destroyPet() {
 
 function applyTransform() {
     if (!state.pet) return;
-    state.pet.style.transform = `translate3d(${state.x}px, ${state.y}px, 0)`;
+    state.pet.style.transform = `translate(${state.x}px, ${state.y}px)`;
     positionBubble();
 }
 
@@ -562,33 +562,14 @@ function setDirection(dir) {
 function positionBubble() {
     if (!state.bubble || !state.pet) return;
     const s = settings();
-
-    // Make sure bubble is rendered first to measure
-    const bubbleW = state.bubble.offsetWidth || 200;
-    const bubbleH = state.bubble.offsetHeight || 40;
-    const margin = 8;
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-
-    // Default: centered above pet
-    let bx = state.x + s.size / 2;
-    let by = state.y - margin;
-    let placeBelow = state.y < bubbleH + 20;
-
-    if (placeBelow) {
-        by = state.y + s.size + margin;
+    state.bubble.style.left = `${state.x + s.size / 2}px`;
+    state.bubble.style.top = `${state.y - 8}px`;
+    if (state.y < 90) {
         state.bubble.classList.add("hh-bubble-below");
+        state.bubble.style.top = `${state.y + s.size + 8}px`;
     } else {
         state.bubble.classList.remove("hh-bubble-below");
     }
-
-    // Clamp horizontally so bubble doesn't get squeezed/wrap to vertical
-    const halfW = bubbleW / 2;
-    if (bx - halfW < margin) bx = halfW + margin;
-    if (bx + halfW > W - margin) bx = W - halfW - margin;
-
-    state.bubble.style.left = `${bx}px`;
-    state.bubble.style.top = `${by}px`;
 }
 
 function showBubble(text) {
@@ -961,19 +942,6 @@ function showRPSUI() {
     if (state.rpsModal) { state.rpsModal.remove(); state.rpsModal = null; }
     const rps = document.createElement("div");
     rps.id = "hh-rps";
-    // Force inline styles to override anything ST might apply via parent transforms
-    rps.style.cssText = `
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        z-index: 2147483647 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    `;
     rps.innerHTML = `
         <div class="hh-rps-card">
             <div class="hh-rps-title">เป่า ยิง ฉุบ!</div>
@@ -985,13 +953,8 @@ function showRPSUI() {
             </div>
         </div>
     `;
-    // Always append to body root, never to a transformed parent
     document.body.appendChild(rps);
     state.rpsModal = rps;
-    // Lock body scroll while modal is open
-    state._prevBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
     rps.querySelectorAll("button[data-c]").forEach(b => {
         b.addEventListener("click", () => {
             const userPick = b.dataset.c;
@@ -1045,8 +1008,6 @@ function revealRPS(container, hamPick, userPick) {
     setTimeout(() => {
         container.remove();
         state.rpsModal = null;
-        // restore body scroll
-        document.body.style.overflow = state._prevBodyOverflow || "";
         finishRPS(result);
     }, 2200);
 }
