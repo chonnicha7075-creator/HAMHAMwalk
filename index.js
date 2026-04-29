@@ -602,6 +602,16 @@ function positionBubble() {
     const bubbleW = state.bubble.offsetWidth || 200;
     const bubbleH = state.bubble.offsetHeight || 40;
 
+    // RPS celebrate/knockout: pin bubble to center of screen so jumping pet
+    // doesn't make it fly around or get clipped offscreen
+    if (state.rpsActive) {
+        state.bubble.classList.remove("hh-bubble-below");
+        // CSS uses translate(-50%, -50%), so left/top is the bubble's center
+        state.bubble.style.left = `${W / 2}px`;
+        state.bubble.style.top = `${H / 2}px`;
+        return;
+    }
+
     // Center horizontally above pet by default
     let bx = state.x + s.size / 2;
     let by = state.y - margin;
@@ -633,6 +643,7 @@ function showBubble(text) {
     if (!state.bubble) return;
     if (state.bubbleTimer) { clearTimeout(state.bubbleTimer); state.bubbleTimer = null; }
     state.bubble.textContent = text;
+    state.bubble.classList.toggle("hh-rps-bubble", !!state.rpsActive);
     state.bubble.classList.add("hh-visible");
     // Position now (rough) and again next frame (accurate, after layout)
     positionBubble();
@@ -643,6 +654,12 @@ function hideBubble() {
     if (!state.bubble) return;
     if (state.bubbleTimer) { clearTimeout(state.bubbleTimer); state.bubbleTimer = null; }
     state.bubble.classList.remove("hh-visible");
+    // Clean up RPS-specific class after fade-out
+    setTimeout(() => {
+        if (state.bubble && !state.bubble.classList.contains("hh-visible")) {
+            state.bubble.classList.remove("hh-rps-bubble");
+        }
+    }, 300);
 }
 
 function sayQueued(text, category = null, holdMs = null) {
@@ -659,8 +676,10 @@ function readingTime(text) {
 async function runQueue() {
     if (state.queueRunning) return;
     state.queueRunning = true;
+    state._queueAbort = false;
     try {
         while (state.queue.length) {
+            if (state._queueAbort) break;
             const item = state.queue.shift();
             showBubble(item.text);
             logSpeech(item.text);
@@ -669,13 +688,24 @@ async function runQueue() {
             const minWait = new Promise(r => setTimeout(r, wait));
             const speech = vocalize(item.text, item.category) || Promise.resolve();
             await Promise.all([minWait, speech]);
+            // Only hide if no new bubble has taken over
+            if (state._queueAbort) break;
             hideBubble();
             await new Promise(r => setTimeout(r, 250));
         }
     } finally {
         state.queueRunning = false;
-        state.status = "idle";
+        state._queueAbort = false;
+        if (state.status === "talking") state.status = "idle";
     }
+}
+
+// Cancel current queue and start fresh (for RPS results, etc.)
+function resetQueue() {
+    state._queueAbort = true;
+    state.queue.length = 0;
+    state.queueRunning = false;
+    if (state.bubbleTimer) { clearTimeout(state.bubbleTimer); state.bubbleTimer = null; }
 }
 
 // ───────────────────────────── Wall climbing ─────────────────────────────
@@ -987,13 +1017,12 @@ function triggerRPSGame() {
     if (state.rpsActive) return;
     state.rpsActive = true;
     state.clickStreak = 0;
-    state.queue.length = 0;
-    state.queueRunning = false;
+    resetQueue();
     if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch (_) {}
     if (state.currentAudio) try { state.currentAudio.pause(); } catch (_) {}
     state.pet.classList.remove("hh-bounce", "hh-knockout", "hh-celebrate");
     setDirection("front");
-    sayQueued(pickOne(RPS_CHALLENGE), "click");
+    setTimeout(() => sayQueued(pickOne(RPS_CHALLENGE), "click"), 50);
     setTimeout(() => showRPSUI(), 1800);
 }
 
@@ -1115,13 +1144,15 @@ function revealRPS(container, hamPick, userPick) {
 function finishRPS(result) {
     const ctx = getContext?.();
     const userName = (ctx?.name1 || "พี่").toString().trim() || "พี่";
-    state.queue.length = 0;
-    state.queueRunning = false;
+    resetQueue();
+    if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch (_) {}
+    if (state.currentAudio) try { state.currentAudio.pause(); } catch (_) {}
 
     if (result === "user") {
         state.pet.classList.remove("hh-bounce", "hh-celebrate");
         state.pet.classList.add("hh-knockout");
-        sayQueued(pickOne(RPS_USER_WIN), "click", 9000);
+        // Wait one tick so the aborted queue's "finally" block runs first
+        setTimeout(() => sayQueued(pickOne(RPS_USER_WIN), "click", 9000), 50);
         setTimeout(() => {
             state.pet?.classList.remove("hh-knockout");
             state.rpsActive = false;
@@ -1131,14 +1162,14 @@ function finishRPS(result) {
         state.pet.classList.remove("hh-bounce", "hh-knockout");
         state.pet.classList.add("hh-celebrate");
         const line = pickOne(RPS_HAM_WIN).replace(/\$\{name\}/g, userName);
-        sayQueued(line, "click", 12000);
+        setTimeout(() => sayQueued(line, "click", 12000), 50);
         setTimeout(() => {
             state.pet?.classList.remove("hh-celebrate");
             state.rpsActive = false;
             state.clickStreak = 0;
         }, 12500);
     } else {
-        sayQueued(pickOne(RPS_TIE), "click", 5000);
+        setTimeout(() => sayQueued(pickOne(RPS_TIE), "click", 5000), 50);
         setTimeout(() => {
             state.rpsActive = false;
             state.clickStreak = 0;
@@ -1427,4 +1458,4 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
 } else {
     setTimeout(boot, 400);
-                      }
+        }
